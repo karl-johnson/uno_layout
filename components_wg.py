@@ -1,0 +1,578 @@
+import numpy as np
+import numpy.random as np_random
+from random import random
+from math import cos, sin, floor, sqrt, pi, ceil
+import scipy.stats
+import random
+import gdsfactory as gf
+from uno_layout import LAYERS, DEFAULT_WG_WIDTH, DEFAULT_RADIUS, waveguide_xs
+
+DEFAULT_BOSCH_WIDTH = 300
+DEFAULT_DES_WIDTH = 8000
+DEFAULT_DICE_WIDTH = 93
+
+
+@gf.cell 
+def apodized_grating_coupler_rectangular(
+        wg_width = 0.5, 
+        fiber_angle = 12, 
+        N = 30, 
+        F0 = 0.9, 
+        R = 0.025, 
+        lambda_c = 1.55, # um 
+        no = 2.69, 
+        ne = 1.444,
+        width_grating = 20, 
+        length_taper = 300):
+    curr_pos = 0
+    widths = []
+    gaps = []
+    for i in range(N):
+        F = F0 - R*curr_pos
+        this_neff = F*no + (1-F)*ne  
+        this_period = lambda_c / (this_neff - sin(fiber_angle/180*pi)) 
+        widths.append(F * this_period)
+        gaps.append((1-F) * this_period)
+        curr_pos = curr_pos + this_period
+    
+    
+    return gf.components.grating_coupler_rectangular_arbitrary(
+        gaps = gaps, 
+        widths = widths,
+        width_grating = width_grating,
+        length_taper = length_taper,
+        layer_grating = LAYERS.WG,
+        cross_section=waveguide_xs(wg_width),
+        layer_slab = False)
+
+@gf.cell
+def mode_filter(wgWidth = DEFAULT_WG_WIDTH,
+                radius = DEFAULT_RADIUS):
+    # series of 4 bends to toss out any weakly-guided modes
+    c = gf.Component()
+    thisXs = waveguide_xs(wgWidth)
+    rightBend = gf.components.bend_euler(radius = radius, angle=90, cross_section = thisXs)
+    leftBend = gf.components.bend_euler(radius = radius, angle=-90, cross_section = thisXs)
+    symbol_to_component = {
+        "r": (rightBend, "o1", "o2"),
+        "L": (leftBend, "o1", "o2"),
+    }
+    sequence = "LrrL"
+    c = gf.components.component_sequence(
+        sequence=sequence, symbol_to_component=symbol_to_component
+    )
+    
+    return c
+
+@gf.cell
+def random_fill_naive(size = (100,50), # dimensions of region
+                postRad = 0.5, # radius of posts
+                density = 1e-1, # avg # of posts per sq micron
+                layer = LAYERS.WG,
+                seed = 0):
+    # fill a region with random posts to scatter light
+    c = gf.Component()
+    # seed RNG for deterministic results
+    np.random.seed(seed)
+    # num posts
+    numPosts = round(density*size[0]*size[1]);
+    postCoords = np.array(size)*np_random.rand(numPosts, 2)
+    postCoords = poisson_disc_samples(size[0], size[1])
+    for i in range(numPosts):
+        (c << gf.components.circle(radius = postRad, layer = layer)).move(postCoords[i])
+    c.flatten()
+    return c
+@gf.cell
+def random_fill_poisson(size = (100,50), # dimensions of region
+                postRad = 0.5, # radius of posts
+                radius = 2.5, # avg # of posts per sq micron
+                layer = LAYERS.WG,
+                seed = 0):
+    # fill a region with random posts to scatter light
+    c = gf.Component()
+    # TODO seed RNG for deterministic results
+    np.random.seed(seed)
+    postCoords = poisson_disc_samples(size[0], size[1], radius)
+    numPosts = len(postCoords)
+    for i in range(numPosts):
+        (c << gf.components.circle(radius = postRad, layer = layer)).move(postCoords[i])
+    c.flatten()
+    return c
+
+# bridson algorithm for poisson disk sampling, copied from https://github.com/emulbreh/bridson/blob/master/bridson/__init__.py
+def poisson_disc_samples(width, height, r, k=5):
+    tau = 2 * np.pi
+    cellsize = r / sqrt(2)
+
+    grid_width = int(ceil(width / cellsize))
+    grid_height = int(ceil(height / cellsize))
+    grid = [None] * (grid_width * grid_height)
+
+    def euclidean_distance(a, b):
+        dx = a[0] - b[0]
+        dy = a[1] - b[1]
+        return sqrt(dx * dx + dy * dy)
+
+    def grid_coords(p):
+        return int(floor(p[0] / cellsize)), int(floor(p[1] / cellsize))
+
+    def fits(p, gx, gy):
+        yrange = list(range(max(gy - 2, 0), min(gy + 3, grid_height)))
+        for x in range(max(gx - 2, 0), min(gx + 3, grid_width)):
+            for y in yrange:
+                g = grid[x + y * grid_width]
+                if g is None:
+                    continue
+                if euclidean_distance(p, g) <= r:
+                    return False
+        return True
+
+    random_func = np_random.rand
+    p = width * random_func(), height * random_func()
+    queue = [p]
+    grid_x, grid_y = grid_coords(p)
+    grid[grid_x + grid_y * grid_width] = p
+
+    while queue:
+        qi = int(random_func() * len(queue))
+        qx, qy = queue[qi]
+        queue[qi] = queue[-1]
+        queue.pop()
+        for _ in range(k):
+            alpha = tau * random_func()
+            d = r * sqrt(3 * random_func() + 1)
+            px = qx + d * cos(alpha)
+            py = qy + d * sin(alpha)
+            if not (0 <= px < width and 0 <= py < height):
+                continue
+            p = (px, py)
+            grid_x, grid_y = grid_coords(p)
+            if not fits(p, grid_x, grid_y):
+                continue
+            queue.append(p)
+            grid[grid_x + grid_y * grid_width] = p
+    return [p for p in grid if p is not None]
+
+
+@gf.cell
+def die_and_floorplan(dieWidth = 10000, desWidth = DEFAULT_DES_WIDTH):
+    c = gf.Component()
+    # die
+    c << gf.components.bbox(
+        bbox = [[-dieWidth/2, -dieWidth/2],[dieWidth/2, dieWidth/2]],
+        layer = LAYERS.DIE)
+    # design region
+    c << gf.components.bbox(
+        bbox = [[-desWidth/2, -desWidth/2],[desWidth/2, desWidth/2]],
+        layer = LAYERS.FLOORPLAN)
+    return c
+
+@gf.cell
+def ant_4x4_template():
+    desWidth = 8780
+    deepTrenchWidth = 260
+    # place design area and dicing/deep trench for Si ANT MPW rules
+    c = gf.Component()
+    # design region
+    c << gf.components.bbox(
+        bbox = [[-desWidth/2, -desWidth/2],[desWidth/2, desWidth/2]],
+        layer = LAYERS.FLOORPLAN)
+    # deep trench
+    c << gf.components.rectangle(
+        size = (desWidth,deepTrenchWidth), 
+        layer = LAYERS.ANT_EDGE_TRENCH, 
+        centered = True)
+    c << gf.components.rectangle(
+        size = (deepTrenchWidth,desWidth), 
+        layer = LAYERS.ANT_EDGE_TRENCH, 
+        centered = True)
+    return c
+
+@gf.cell
+def ant_trench_perimeter():
+    innerWidth = 8780
+    outerWidth = 9300
+    c = gf.Component()
+    for angle in [0, 90, 180, 270]:
+        (c << gf.components.bbox(((-outerWidth/2,innerWidth/2),(outerWidth/2, outerWidth/2)), layer = LAYERS.ANT_EDGE_TRENCH)).rotate(angle)
+    
+    
+    return c
+
+@gf.cell
+def mla_cross(layer, thick = 20, length = 200, dot = False, dotRad = 10, dotDx = 50, dotDy = 50):
+    
+    # alignment cross includes dot to indicate which corner this is
+    c = gf.Component()
+    
+    c << gf.components.cross(thick, length, layer = layer)
+    if(dot):
+        circ = c << gf.components.circle(radius = dotRad, layer = layer)
+        circ.move((-dotDx, -dotDy))
+    return c
+
+@gf.cell
+def mla_crosses(dx = 4000, dy = 4000, thisLayer = LAYERS.LABEL,
+                includeArrow = True):
+    c = gf.Component()
+    cross = mla_cross(layer = thisLayer)
+    for cIdx in range(4):
+        thisC = c << cross
+        thisC.move(destination=(dx,dy))
+        if(cIdx == 1 or cIdx == 3):
+            thisC.mirror((0,1))
+        if(cIdx == 2 or cIdx == 3):
+            thisC.mirror((1,0))
+    # big "this way up" arrows
+    if(includeArrow):
+        a = c << arrow(height = 100)
+        a.move((dx/2, dy))
+        a = c << arrow(height = 100)
+        a.move((-dx/2, dy))
+    return c
+
+@gf.cell
+def arrow(height = 25, layer = LAYERS.LABEL):
+    c = gf.Component()
+    arrowPolygon = height*np.array([[-0.2,-1], [0.2, -1], [0.2,0.6], [0.4,0.6], [0,1], [-0.4, 0.6], [-0.2, 0.6], [-0.2,0]])
+    c.add_polygon(arrowPolygon, layer = layer)
+    return c
+
+@gf.cell
+def bosch_for_quadrants(boschWidth = DEFAULT_BOSCH_WIDTH, 
+                      desWidth = DEFAULT_DES_WIDTH):
+    # marks on wg layer
+    c = gf.Component()
+    # Bosch deep trench zones
+    ko_box = np.array([[-boschWidth/2, -desWidth/2],[boschWidth/2, desWidth/2]])
+    c << gf.components.bbox(
+        bbox = ko_box,
+        layer = LAYERS.BOSCH)
+    c << gf.components.bbox(
+        bbox = np.flip(ko_box), # alternative to rotate(90)
+        layer = LAYERS.BOSCH)
+    return c
+
+@gf.cell
+def dicing_lanes(lanesX, # x coordinates of vertical dicing (list)
+                 lanesY, # y coordinates of horizontal dicing (list)
+                 bladeWidth = DEFAULT_DICE_WIDTH, # width of dicing blade
+                 tickSeparation = DEFAULT_DES_WIDTH + 500, # location of dicing marks
+                 tickLayer = LAYERS.LABEL,
+                 doBosch = True,
+                 doCrosses = True,
+                 boschWidth = DEFAULT_BOSCH_WIDTH,
+                 boschLength = DEFAULT_DES_WIDTH,
+                 boschLayer = LAYERS.BOSCH):
+    
+    c = gf.Component()
+    
+    # dicing ticks
+    # for thisX in lanesX:
+    #     thisT = c << dicing_end_ticks(separation = tickSeparation, laneWidth = DEFAULT_DICE_WIDTH)
+    #     thisT.rotate(90)
+    #     thisT.move((thisX, 0))
+    # for thisY in lanesY:
+    #     thisT = c << dicing_end_ticks(separation = tickSeparation, laneWidth = DEFAULT_DICE_WIDTH)
+    #     thisT.move((0, thisY))
+        
+    # crosses
+    if(doCrosses):
+        crossForDicing = mla_cross(layer= tickLayer, dot = False)
+        for thisX in lanesX:
+            thisT = c << crossForDicing 
+            thisT.move((thisX, tickSeparation/2))
+            thisT = c << crossForDicing 
+            thisT.move((thisX, -tickSeparation/2))
+        for thisY in lanesY:
+            thisT = c << crossForDicing 
+            thisT.move((tickSeparation/2, thisY))
+            thisT = c << crossForDicing 
+            thisT.move((-tickSeparation/2, thisY))
+    
+    if(doBosch):
+        boschBox = np.array([[-boschWidth/2, -boschLength/2],[boschWidth/2, boschLength/2]])
+        for thisX in lanesX:
+            thisR = c << gf.components.bbox(bbox = boschBox, 
+                                            layer = boschLayer)
+            thisR.move((thisX, 0))
+        for thisY in lanesY:
+            thisR = c << gf.components.bbox(bbox = np.flip(boschBox), 
+                                            layer = boschLayer)
+            thisR.move((0, thisY))
+    return c
+
+@gf.cell 
+def dicing_end_ticks(separation, laneWidth = DEFAULT_DICE_WIDTH, layer = LAYERS.LABEL):
+    c = gf.Component()
+    t1 = c << dicing_tick_single(layer = layer).rotate(90)
+    t1.move(destination = (separation/2, laneWidth/2))
+    t2 = c << dicing_tick_single(layer = layer).rotate(180)
+    t2.move(destination = (separation/2, -laneWidth/2))
+    t1 = c << dicing_tick_single(layer = layer).rotate(0)
+    t1.move(destination = (-separation/2, laneWidth/2))
+    t2 = c << dicing_tick_single(layer = layer).rotate(270)
+    t2.move(destination = (-separation/2, -laneWidth/2))
+    return c
+
+@gf.cell 
+def dicing_tick_single(w1 = 75, w2 = 75, bevel = 5, layer = LAYERS.LABEL, position = (0,0)):
+    c = gf.Component()
+    # this will raise an error unless you force one element to be float with
+    # a decimal etc.
+    tickPolygon = np.array([[0.0,0], [w1, 0], [w1, bevel], [bevel, w2], [0, w2]])
+    tickPolygon += np.array(position)
+    c.add_polygon(tickPolygon, layer = layer)
+    return c
+
+@gf.cell
+def straight_waveguide(dxdy = (1000,1000),
+                       wgWidth = None, 
+                       labelIn = None, 
+                       labelOut = None,
+                       tipWidth = None,
+                       boschWidth = DEFAULT_BOSCH_WIDTH):
+    # straight waveguide from in->out at specified dx/dy
+    c = gf.Component()
+    crossSection = waveguide_xs(wgWidth)
+    ed = c << edge_coupler_pair(dxdy, wgWidth, labelIn, labelOut,
+                                tipWidth = tipWidth,
+                                boschWidth = boschWidth)
+    route = gf.routing.get_route(ed.ports["o1"], ed.ports["o2"],
+                                   radius=DEFAULT_RADIUS,
+                                   cross_section=crossSection)
+    c.add(route.references)
+    return c
+
+@gf.cell
+def fib_structures(thisWgWidth, thisGap, length = 100):
+    c = gf.Component()
+    # waveguides of various widths for FIB milling + cross section imaging
+    (c << gf.components.rectangle(
+        layer = LAYERS.WG, 
+        size = (length,thisWgWidth),
+        centered = True))
+    (c << gf.components.rectangle(
+        layer = LAYERS.WG, 
+        size = (length,1),
+        centered = True)).move((0,50))
+    # also do same geometry as coupling region in ring
+    (c << gf.components.coupler_straight(
+        gap = thisGap,
+        length = length,
+        width = thisWgWidth)).move((-length/2,100))
+    # label
+    # c << gf.components.text('FIB', size = 40, layer = LAYERS.LABEL, position = (225, 25))
+    return c
+
+# array of edge couplers for fiber arrays
+@gf.cell
+def edge_coupler_array(couplerComponent = None, 
+                       n = 16,
+                       dx = 127,
+                       couplerRotation = 90):
+    c = gf.Component()
+    couplerComponent = edge_coupler() if couplerComponent is None else couplerComponent
+    for i in range(n):
+        thisC = (c << couplerComponent).rotate(couplerRotation)
+        thisC.movex(dx*i)
+        c.add_port(f"o{i}", port = thisC.ports['o2'])
+    return c
+
+
+@gf.cell
+def edge_coupler_pair(dxdy = (1000,1000),
+                      wgWidth = None, 
+                      labelIn = None, 
+                      labelOut = None, 
+                      tipWidth = None,
+                      boschWidth = DEFAULT_BOSCH_WIDTH):
+    dx = dxdy[0]
+    dy = dxdy[1]
+    c = gf.Component()
+    e1 = c << edge_coupler(tipWidth, wgWidth, straightLength = boschWidth/2)
+    e1.move(e1.ports["o1"], (0, dy))
+    e2 = c << edge_coupler(tipWidth, wgWidth, straightLength = boschWidth/2)
+    e2.rotate(90)
+    e2.move(e2.ports["o1"], (dx, 0))
+    c.add_port("o1", port = e1.ports["o2"], orientation = 0)
+    c.add_port("o2", port = e2.ports["o2"], orientation = 90)
+    if labelIn is not None:
+        c << gf.components.text(text = labelIn, size = 40, 
+                                position = (boschWidth, dy + 15),
+                                layer = LAYERS.LABEL)
+    if labelOut is not None:
+        ot = c << gf.components.text(text = labelOut, size = 40,
+                                layer = LAYERS.LABEL,
+                                justify = "right")
+        ot.rotate(-90)
+        ot.move(destination = (dx + 15, boschWidth))
+
+    return c
+
+@gf.cell
+def edge_coupler_tri(dxdy = (1000,1000),
+                      wgWidth = None, 
+                     edgeSep = None, 
+                     labelIn = None, 
+                     labelOut = None, 
+                     tipWidth = None,
+                     boschWidth = None,
+                     textPosition = None):
+    # labelOut must be a tuple!
+    dx = dxdy[0]
+    dy = dxdy[1]
+    c = gf.Component()
+    thisEdgeCoupler = edge_coupler(tipWidth, wgWidth, straightLength=boschWidth)
+    e1 = c << thisEdgeCoupler
+    e1.move(e1.ports["o1"], (0, dy))
+    e2 = c << thisEdgeCoupler
+    e2.rotate(90)
+    e3 = c << thisEdgeCoupler
+    e3.rotate(90)
+    
+    e2.move(e2.ports["o1"], (dx, 0))
+    e3.move(e3.ports["o1"], (dx + edgeSep, 0))
+    
+    c.add_port("o1", port = e1.ports["o2"], orientation = 0)
+    c.add_port("o2", port = e2.ports["o2"], orientation = 90)
+    c.add_port("o3", port = e3.ports["o2"], orientation = 90)
+    if textPosition is None:
+        textPosition = (300,15)
+    textPositionNp = np.array(textPosition)
+    if labelIn is not None:
+        c << gf.components.text(text = labelIn, size = 40, 
+                                position = np.array((0,dy)) + textPositionNp,
+                                layer = LAYERS.LABEL)
+    if labelOut is not None:
+        ot = c << gf.components.text(text = labelOut[0], size = 40,
+                                layer = LAYERS.LABEL,
+                                justify = "right")
+        ot.rotate(-90)
+        ot.move(destination = np.array((dx,0)) + np.flip(textPositionNp))
+        
+        ot = c << gf.components.text(text = labelOut[1], size = 40,
+                                layer = LAYERS.LABEL,
+                                justify = "right")
+        ot.rotate(-90)
+        ot.move(destination = np.array((dx + edgeSep,0)) + np.flip(textPositionNp))
+    return c
+
+@gf.cell
+def normal_mmi_with_sbend(wgWidth = 0.5):
+    # TODO figure out why no width mismatch errors on this + mode filter
+    # decent broadband TE/TM coupler, with s bend escapes so waveguides
+    # aren't super close AND SUPER ANNOYING TO ROUTE UGGGGH
+    c = gf.Component()
+    xs = waveguide_xs(wgWidth)
+    mmiSplitter = c << gf.components.mmi1x2(width = wgWidth,
+                                            width_taper = 1,
+                                            length_taper = 15,
+                                            length_mmi = 5.5,
+                                            width_mmi = 2.5,
+                                            gap_mmi = 0.25)
+    s1 = c << gf.components.bend_s((30,10), cross_section = xs)
+    s1.connect('o1', mmiSplitter.ports['o2'])
+    s2 = c << gf.components.bend_s((30,-10), cross_section = xs)
+    s2.connect('o1', mmiSplitter.ports['o3'])
+    
+    c.add_port('o1', port = mmiSplitter.ports['o1'])
+    c.add_port('o2', port = s1.ports['o2'])
+    c.add_port('o3', port = s2.ports['o2'])
+    return c
+
+@gf.cell
+def edge_coupler(tipWidth = None, # tip width
+                 wgWidth = None,
+                 taperLength = None,
+                 straightLength = None):
+    # TODO make it easier to globally set edge coupler tip width!
+    # straight section at tip width while under dicing blade, then taper
+    wgWidth = DEFAULT_WG_WIDTH if wgWidth is None else wgWidth
+    tipWidth = 0.11 if tipWidth is None else tipWidth
+    taperLength = 50 if taperLength is None else taperLength
+    straightLength = DEFAULT_BOSCH_WIDTH/2 if straightLength is None else straightLength
+    
+    c = gf.Component()
+    straightPath = gf.path.straight(length = straightLength)
+    #aperPath = gf.path.straight(length = taperLength)
+    p1 = c << gf.path.extrude(straightPath, layer = LAYERS.WG, width = tipWidth)
+    p2 = c << gf.components.taper(length = taperLength, width1 = tipWidth, width2 = wgWidth, layer= LAYERS.WG)
+    p2.connect('o1', p1.ports['o2'])
+    c.add_port('o1', port = p1.ports['o1'])
+    c.add_port('o2', port = p2.ports['o2'])
+    return c
+
+
+@gf.cell
+def y_splitter_adiabatic(w1 = DEFAULT_WG_WIDTH, g1 = 0.15, t1 = 0.15, 
+                         w2 = DEFAULT_WG_WIDTH, g2 = 0.15, t2 = 0.15, 
+                         length = 30, escape = 25, outSep = 5, thisLayer = (1,0)):
+    # do taper region with gdsfactory trickery
+    # first CrossSection
+    startOffset = w1/2 + g1 + t1/2
+    s10 = gf.Section(width=w1, offset=0, layer=thisLayer, name = "center")
+    s11 = gf.Section(width=t1, offset=startOffset, layer=thisLayer, name = "top")
+    s12 = gf.Section(width=t1, offset=-startOffset, layer=thisLayer, name = "bot")
+    X1 = gf.CrossSection(sections=[s10, s11, s12])
+    # second CrossSection that we want to transition to
+    endOffset = w2/2 + g2 + t2/2
+    s20 = gf.Section(width=t2, offset=0, layer=thisLayer, name = "center")
+    s21 = gf.Section(width=w2, offset=endOffset, layer=thisLayer, name = "top")
+    s22 = gf.Section(width=w2, offset=-endOffset, layer=thisLayer, name = "bot")
+    X2 = gf.CrossSection(sections=[s20, s21, s22])
+    
+    c = gf.Component()
+    c << gf.components.taper_cross_section(length = length,
+                                              cross_section1 = X1,
+                                              cross_section2 = X2,
+                                              linear=True)
+    # cross section for escapes
+    X3 = gf.CrossSection(sections=[gf.Section(width=w2, offset=0, layer=thisLayer)])
+    e1 = c << gf.components.bend_s(size = [escape, outSep/2 - endOffset], cross_section=X3)
+    # we could try to fuss with ports but not worth it
+    e1.move((length, endOffset))
+    e2 = c << gf.components.bend_s(size = [escape, -(outSep/2 - endOffset)], cross_section=X3)
+    # we could try to fuss with ports but not worth it
+    e2.move((length, -endOffset))
+    # put one at the front for good measure
+    X4 = gf.CrossSection(sections=[gf.Section(width=w1, offset=0, layer=thisLayer)])
+    s = c << gf.components.straight(length = escape, cross_section = X4)
+    s.move((-escape, 0))
+    
+    # Ports
+    c.add_port('o1', center = (-escape, 0), orientation=180, cross_section=X4)
+    c.add_port('o2', center = (length+escape, outSep/2), orientation= 0, cross_section=X3)
+    c.add_port('o3', center = (length+escape, -outSep/2), orientation= 0, cross_section=X3)
+    return c
+    
+@gf.cell 
+def timestamp(position = (0,0),
+              quadrantLabel = "QUAD_NAME",
+              designerLogo = None,
+              designerLogoGdsHeight = 64):
+    c = gf.Component()
+    timeStamp = c << gf.components.version_stamp(labels = [quadrantLabel], 
+                                     with_qr_code=False, 
+                                     layer=LAYERS.LABEL, 
+                                     pixel_size=1, text_size=50)
+    timeStamp.move((0,0),position)
+    if designerLogo is not None:
+        logo = c << designer_logo(height = 75, file = designerLogo, gdsHeight = designerLogoGdsHeight)
+        logo.move((logo.xmax,logo.ymin), (timeStamp.xmax, timeStamp.ymin))
+    return c
+
+
+@gf.cell 
+def designer_logo(height = 75, # height when placed in layout
+                  file = None, # file containing logo, assumed square
+                  gdsHeight = 64): # logo height in original file
+    # unique logo for designer to put alongside timestamp
+    if file is None:
+        raise Exception("No file supplied")
+    polygons = gf.read.import_gds(file).get_polygons()
+    scaledPoly = [height/gdsHeight*polygon for polygon in polygons]
+    c = gf.Component()
+    for thisPoly in scaledPoly:
+        c.add_polygon(thisPoly, layer = LAYERS.LABEL)
+    return c
