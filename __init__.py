@@ -2,8 +2,10 @@ import gdsfactory as gf
 from gdsfactory.technology import LayerMap
 from gdsfactory.typings import Layer
 
+
 """ Library of common tools and components for waveguide layout in UCSD UNO group.
  Also includes standard layer assignments etc, similar to Applied Nanotools'
+ This version of the library is made for GDSfactory 8 and uses nm units!
  Naming conventions:
      classes: CapWords
      functions: lowercase_with_underscores
@@ -28,12 +30,14 @@ class LayerMapUNO(LayerMap):
     ANT_THERMAL_TRENCH: Layer = (203, 0)
     ANNOTATION: Layer = (210, 0) # gds-only annotations, not printed
 
-LAYERS = LayerMapUNO()
+LAYERS = LayerMapUNO
 # recommended way to reference layers: from uno_layout import LAYERS
 # then you can simply do LAYERS.WG etc everywhere
-DEFAULT_WG_WIDTH = 0.5
-DEFAULT_RADIUS = 25
-DEFAULT_EDGE_SEP = 100
+DEFAULT_WG_WIDTH = 500
+DEFAULT_RADIUS = 25000
+DEFAULT_EDGE_SEP = 100000
+DEFAULT_TEXT_SIZE = 25000
+DEFAULT_DXDY = (1000e3,1000e3)
 
 def waveguide_xs(wgWidth = DEFAULT_WG_WIDTH):
     # returns a simple waveguide cross-section so we don't have to deal with
@@ -47,7 +51,7 @@ def waveguide_xs(wgWidth = DEFAULT_WG_WIDTH):
     return gf.CrossSection(sections = [s0], radius = DEFAULT_RADIUS)
 
 
-DEFAULT_ROUTE_WIDTH = 25
+DEFAULT_ROUTE_WIDTH = 25000
 
 def routing_xs(rtWidth = DEFAULT_ROUTE_WIDTH):
     # default if passed None:

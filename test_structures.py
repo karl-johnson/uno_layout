@@ -5,10 +5,10 @@ import uno_layout.components_heater as uno_ht
 
 @gf.cell
 def boschGapTest(tWidthList, 
-                 dx = 1000, 
-                 dy = 1000, 
-                 tLength = 500, 
-                 bridge = 50):
+                 dx = 1000e3, 
+                 dy = 1000e3, 
+                 tLength = 500e3, 
+                 bridge = 50e3):
     c = gf.Component()
     thisDx = dx
     thisDy = dy
@@ -23,11 +23,11 @@ def boschGapTest(tWidthList,
 
 @gf.cell
 def boschBridgeTest(tBridgeList,
-                    tLength = 500,
-                    tWidth = 100,
-                    dx = 3100,
-                    wdy = 3100,
-                    rdy = 500,
+                    tLength = 500e3,
+                    tWidth = 100e3,
+                    dx = 3100e3,
+                    wdy = 3100e3,
+                    rdy = 500e3,
                     wgWidth = DEFAULT_WG_WIDTH,
                     edgeSep = DEFAULT_EDGE_SEP):
     # run waveguides through bosch "bridges" to see what's safe
@@ -63,7 +63,7 @@ def boschBridgeTest(tBridgeList,
     return c
 
 @gf.cell
-def routingTestStructure(padSep = 1000, width = DEFAULT_ROUTE_WIDTH):
+def routingTestStructure(padSep = 1000e3, width = DEFAULT_ROUTE_WIDTH):
     c = gf.Component()
     p1 = c << uno_ht.rectPad()
     p2 = c << uno_ht.rectPad()
@@ -79,7 +79,7 @@ def routingTestStructure(padSep = 1000, width = DEFAULT_ROUTE_WIDTH):
     return c
 
 @gf.cell
-def straightHeaterTestStructure(padSep = 1000, heaterLength = 500, width = 25):
+def straightHeaterTestStructure(padSep = 1000e3, heaterLength = 500e3, width = 25e3):
     c = gf.Component()
     p1 = c << uno_ht.rectPad()
     p2 = c << uno_ht.rectPad()
@@ -98,7 +98,7 @@ def straightHeaterTestStructure(padSep = 1000, heaterLength = 500, width = 25):
     return c
 
 @gf.cell
-def snakeHeaterTestStructure(padSep = 1000, hLength = 500, hNum = 7, hSpacing = 25, width = 10):
+def snakeHeaterTestStructure(padSep = 1000e3, hLength = 500e3, hNum = 7, hSpacing = 25e3, width = 10e3):
     c = gf.Component()
     p1 = c << uno_ht.rectPad()
     p2 = c << uno_ht.rectPad()

@@ -7,23 +7,23 @@ import numpy as np
 from functools import partial
 
 
-dieWidth = 12000
-desWidth = 8000
+dieWidth = 1.2e6
+desWidth = 8e6
 logoFile = "uno_layout/examples/kj.gds"
-globalWgWidth = 0.450
+globalWgWidth = 0.450e3
 
 @gf.cell
 def full_chip():
     c = gf.Component()
     c << uno_wg.die_and_floorplan(dieWidth = dieWidth, desWidth = desWidth)
-    ringLength = 500
-    structure_spacing = 700
-    middle_spacing = 1200
+    ringLength = 500e3
+    structure_spacing = 700e3
+    middle_spacing = 1200e3
     # TE arrays
     TEringPartial = partial(sixteen_grating_3_rings,
                             thisWgWidth=globalWgWidth,
-                            couplerGaps = [0.3, 0.3, 0.2],
-                            couplerLengths = [2, 7, 2.5],
+                            couplerGaps = [0.3e3, 0.3e3, 0.2e3],
+                            couplerLengths = [2e3, 7e3, 2.5e3],
                             ringLengths = [ringLength, ringLength, ringLength])
     # TE1 = (c << TEringPartial(ant_grating_TE_air(globalWgWidth))).rotate(180)
     # TE1.move(TE1.center, (0, middle_spacing/2))
@@ -117,13 +117,13 @@ def full_chip():
 
 @gf.cell
 def sixteen_grating_3_rings(gratingComponent,
-                            thisWgWidth = 0.45,
+                            thisWgWidth = 0.45e3,
                             numGratings = 16,
-                            gratingPitch = 250,
-                            couplerGaps = [0.1, 0.2, 0.3],
-                            couplerLengths = [15, 20, 25],
-                            ringLengths = [500, 600, 700],
-                            loopback_spacing_to_grating = 50):
+                            gratingPitch = 250e3,
+                            couplerGaps = [0.1e3, 0.2e3, 0.3e3],
+                            couplerLengths = [15e3, 20e3, 25e3],
+                            ringLengths = [500e3, 600e3, 700e3],
+                            loopback_spacing_to_grating = 50e3):
     c = gf.Component()
     waveguideXs = waveguide_xs(thisWgWidth)
     gratingArray = c << gf.components.grating_coupler_array(
@@ -134,9 +134,9 @@ def sixteen_grating_3_rings(gratingComponent,
         with_loopback = False)
 
     # loop back on ports 1-16    
-    loopback_y1 = gratingArray.ymin - loopback_spacing_to_grating
-    loopback_y2 = gratingArray.ymax + loopback_spacing_to_grating
-    c.add(gf.routing.get_route_from_steps(
+    loopback_y1 = gratingArray.dymin - loopback_spacing_to_grating
+    loopback_y2 = gratingArray.dymax + loopback_spacing_to_grating
+    gf.routing.route_single_from_steps(c,
         gratingArray.ports["o0"], gratingArray.ports['o15'], 
         steps = [
         {"y": loopback_y1},
@@ -146,14 +146,13 @@ def sixteen_grating_3_rings(gratingComponent,
         {"y": loopback_y1},
         {"dx": -gratingPitch}
         ],
-        cross_section = waveguideXs,
-        with_sbend=False
-        ).references)
+        cross_section = waveguideXs
+        )
     
     
-    c.add(gf.routing.get_route(
+    gf.routing.route_single(c,
         gratingArray.ports["o7"], gratingArray.ports['o8'], cross_section = waveguideXs
-        ).references)
+        )
     
     # on a 16-port ring, room for 3 add-drop rings on (2,3,4,5), (6,7,10,11), (12,13,14,15)
 

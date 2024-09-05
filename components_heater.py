@@ -1,9 +1,9 @@
 import numpy as np
 import gdsfactory as gf
-from uno_layout import LAYERS, DEFAULT_ROUTE_WIDTH, routing_xs
+from uno_layout import LAYERS, DEFAULT_ROUTE_WIDTH, DEFAULT_TEXT_SIZE, routing_xs
 
 @gf.cell
-def rect_heater(length = 50, width = 10, routeWidth = None):
+def rect_heater(length = 50e3, width = 10e3, routeWidth = None):
     # legacy method of construction, could be replaced with simple Path
     c = gf.Component()
     c << gf.components.rectangle(size = (width, length), 
@@ -17,9 +17,9 @@ def rect_heater(length = 50, width = 10, routeWidth = None):
     return c
 
 @gf.cell
-def rectPad(width = 200,
-            height = 150,
-            openingInset = 30,
+def rectPad(width = 200e3,
+            height = 150e3,
+            openingInset = 30e3,
             routeWidth = None):
     c = gf.Component()
     c << gf.components.rectangle(size = (width, height), 
@@ -39,7 +39,7 @@ def rectPad(width = 200,
 @gf.cell
 def pad_array(
     pad: gf.Component,
-    spacing: tuple[float, float] = (150.0, 150.0),
+    spacing: tuple[float, float] = (150.0e3, 150.0e3),
     columns: int = 6,
     rows: int = 1,
     cross_section: gf.CrossSection = routing_xs(),
@@ -56,12 +56,12 @@ def pad_array(
     return c
 
 @gf.cell
-def snake_heater(length = 1000,
-                 N = 5,
-                 spacing = 25,
-                 width = 10,
-                 extraEnds = 50,
-                 rotateAngle = 0):
+def snake_heater(length = 1000e3,
+                 N = 5e3,
+                 spacing = 25e3,
+                 width = 10e3,
+                 extraEnds = 50e3,
+                 rotateAngle = 0e3):
     thisSection = gf.cross_section.cross_section(width = width, 
                                                  layer = LAYERS.HEATER,
                                                  port_names=('e0', 'e1'))
@@ -93,11 +93,10 @@ def snake_heater(length = 1000,
     P.rotate(rotateAngle)
     c = gf.Component()
     snake = c << gf.path.extrude(P, thisSection)
-    TEXT_SIZE = 25
     c << gf.components.text(text = f"{1e-3*P.length():.0f}mm/{width:.2f}um = {P.length()/width:.1f}", 
                             layer = LAYERS.ANNOTATION,
-                            position = np.array(snake.center) - np.array((0,2*TEXT_SIZE)),
+                            position = np.array(snake.center) - np.array((0,2*DEFAULT_TEXT_SIZE)),
                             justify = "center",
-                            size = TEXT_SIZE)
+                            size = DEFAULT_TEXT_SIZE)
     c.add_ports(snake.ports)
     return c

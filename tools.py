@@ -32,8 +32,8 @@ def offset_waveguide(componentIn, offsetDistance):
 
 @gf.cell
 def generic_2port(dutComponent: gf.Component, 
-                  straight1 = 500, # length of straight waveguide before component
-                  dxdy = (1000,1000), # location of 2nd coupler along x axis, and
+                  straight1 = 500e3, # length of straight waveguide before component
+                  dxdy = (1000e3,1000e3), # location of 2nd coupler along x axis, and
                                       # location of 1st coupler along y axis, resp.
                   wgWidth = None, # routing waveguide width
                   labelIn = None, # input edge coupler label
@@ -78,13 +78,13 @@ def generic_2port(dutComponent: gf.Component,
                                 layer = LAYERS.ANNOTATION,
                                 position = (dut.center[0], dut.center[1]),
                                 justify = "center",
-                                size = 25)
+                                size = 25e3)
     return c
 
 @gf.cell
 def generic_3port(dutComponent: gf.Component, # see generic_2port for variable definitions
-                    straightL = 500, 
-                    dxdy = (1000,1000), 
+                    straightL = 500e3, 
+                    dxdy = (1000e3,1000e3), 
                     wgWidth = None, 
                     edgeSep = DEFAULT_EDGE_SEP,
                     labelIn = None, 
