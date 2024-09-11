@@ -33,11 +33,11 @@ class LayerMapUNO(LayerMap):
 LAYERS = LayerMapUNO
 # recommended way to reference layers: from uno_layout import LAYERS
 # then you can simply do LAYERS.WG etc everywhere
-DEFAULT_WG_WIDTH = 500
-DEFAULT_RADIUS = 25000
-DEFAULT_EDGE_SEP = 100000
-DEFAULT_TEXT_SIZE = 25000
-DEFAULT_DXDY = (1000e3,1000e3)
+DEFAULT_WG_WIDTH = 0.500
+DEFAULT_RADIUS = 15
+DEFAULT_EDGE_SEP = 100
+DEFAULT_TEXT_SIZE = 25
+DEFAULT_DXDY = (1000e0,1000e0)
 
 def waveguide_xs(wgWidth = DEFAULT_WG_WIDTH):
     # returns a simple waveguide cross-section so we don't have to deal with

@@ -5,25 +5,26 @@ import uno_layout.common_wg_devices as uno_wgd
 from uno_layout import waveguide_xs, LAYERS
 import numpy as np
 from functools import partial
+from uno_layout.tools import dp2tuple
 
 
-dieWidth = 1.2e6
-desWidth = 8e6
+dieWidth = 12000e0
+desWidth = 8000e0
 logoFile = "uno_layout/examples/kj.gds"
-globalWgWidth = 0.450e3
+globalWgWidth = 0.450e0
 
 @gf.cell
 def full_chip():
     c = gf.Component()
     c << uno_wg.die_and_floorplan(dieWidth = dieWidth, desWidth = desWidth)
-    ringLength = 500e3
-    structure_spacing = 700e3
-    middle_spacing = 1200e3
+    ringLength = 500e0
+    structure_spacing = 700e0
+    middle_spacing = 1200e0
     # TE arrays
     TEringPartial = partial(sixteen_grating_3_rings,
                             thisWgWidth=globalWgWidth,
-                            couplerGaps = [0.3e3, 0.3e3, 0.2e3],
-                            couplerLengths = [2e3, 7e3, 2.5e3],
+                            couplerGaps = [0.3e0, 0.3e0, 0.2e0],
+                            couplerLengths = [2e0, 7e0, 2.5e0],
                             ringLengths = [ringLength, ringLength, ringLength])
     # TE1 = (c << TEringPartial(ant_grating_TE_air(globalWgWidth))).rotate(180)
     # TE1.move(TE1.center, (0, middle_spacing/2))
@@ -39,8 +40,8 @@ def full_chip():
             ne = 1.444,
             width_grating = 20, 
             length_taper = 300)
-    TE2 = (c << TEringPartial(our_grating_TE)).rotate(180)
-    TE2.move(TE2.center, (0, middle_spacing/2 + structure_spacing))
+    TE2 = (c << TEringPartial(our_grating_TE)).drotate(180)
+    TE2.dmove(dp2tuple(TE2.dcenter), (0, middle_spacing/2 + structure_spacing))
     
     our_grating_TE_air = uno_wg.apodized_grating_coupler_rectangular(
             wg_width = globalWgWidth, 
@@ -53,8 +54,8 @@ def full_chip():
             ne = 1.222,
             width_grating = 20, 
             length_taper = 300)
-    TE3 = (c << TEringPartial(our_grating_TE_air)).rotate(180)
-    TE3.move(TE3.center, (0, middle_spacing/2 + 2*structure_spacing))
+    TE0 = (c << TEringPartial(our_grating_TE_air)).drotate(180)
+    TE0.dmove(dp2tuple(TE0.dcenter), (0, middle_spacing/2 + 2*structure_spacing))
     
     # TM arrays
     TMringPartial = partial(sixteen_grating_3_rings,
@@ -77,8 +78,8 @@ def full_chip():
             width_grating = 20, 
             length_taper = 300)
 
-    TM2 = (c << TMringPartial(our_grating_TM)).rotate(180)
-    TM2.move(TM2.center, (0, -middle_spacing/2 - structure_spacing))
+    TM2 = (c << TMringPartial(our_grating_TM)).drotate(180)
+    TM2.dmove(dp2tuple(TM2.dcenter), (0, -middle_spacing/2 - structure_spacing))
     
     our_grating_TM_air = uno_wg.apodized_grating_coupler_rectangular(
             wg_width = globalWgWidth, 
@@ -92,12 +93,12 @@ def full_chip():
             width_grating = 20, 
             length_taper = 300)
 
-    TM3 = (c << TMringPartial(our_grating_TM_air)).rotate(180)
-    TM3.move(TM3.center, (0, -middle_spacing/2 - 2*structure_spacing))
+    TM3 = (c << TMringPartial(our_grating_TM_air)).drotate(180)
+    TM3.dmove(dp2tuple(TM3.dcenter), (0, -middle_spacing/2 - 2*structure_spacing))
     
-    ts = c << uno_wg.timestamp(designerLogo = logoFile,
+    ts = c << uno_wg.timestamp(designerLogo = None, #logoFile,
                           quadrantLabel = "F")
-    ts.move(ts.center, (-400,150))
+    ts.dmove(dp2tuple(ts.dcenter), (-400,150))
     # labels
     y1 = 325
     c << gf.components.text("TE", position = (-2000, y1), size = 50, layer = LAYERS.LABEL)
@@ -107,23 +108,23 @@ def full_chip():
     c << gf.components.text("3", position = (1235, y1), size = 50, layer = LAYERS.LABEL)
 
     # waveguides and cleave markers for FIB
-    (c << uno_wg.fib_structures(globalWgWidth, 0.2, length = 600)).rotate(-90).move((-50,0))
+    (c << uno_wg.fib_structures(globalWgWidth, 0.2, length = 600)).drotate(-90).dmove((-50,0))
     
-    (c << uno_wg.mla_cross(LAYERS.LABEL, thick = 20, length = 200)).move((4000,0))
-    (c << uno_wg.mla_cross(LAYERS.LABEL, thick = 20, length = 200)).move((-4000,0))
+    (c << uno_wg.mla_cross(LAYERS.LABEL, thick = 20, length = 200)).dmove((4000,0))
+    (c << uno_wg.mla_cross(LAYERS.LABEL, thick = 20, length = 200)).dmove((-4000,0))
         
     
     return c
 
 @gf.cell
 def sixteen_grating_3_rings(gratingComponent,
-                            thisWgWidth = 0.45e3,
+                            thisWgWidth = 0.45e0,
                             numGratings = 16,
-                            gratingPitch = 250e3,
-                            couplerGaps = [0.1e3, 0.2e3, 0.3e3],
-                            couplerLengths = [15e3, 20e3, 25e3],
-                            ringLengths = [500e3, 600e3, 700e3],
-                            loopback_spacing_to_grating = 50e3):
+                            gratingPitch = 250e0,
+                            couplerGaps = [0.1e0, 0.2e0, 0.3e0],
+                            couplerLengths = [15e0, 20e0, 25e0],
+                            ringLengths = [500e0, 600e0, 700e0],
+                            loopback_spacing_to_grating = 50e0):
     c = gf.Component()
     waveguideXs = waveguide_xs(thisWgWidth)
     gratingArray = c << gf.components.grating_coupler_array(
@@ -172,8 +173,7 @@ def sixteen_grating_3_rings(gratingComponent,
                             thisGap = couplerGaps[i], 
                             includeHeater = False)
         thisMiddlePort = portsForHorizLoc[i]
-        # the 0.001 here is a hack to fix something that is fixed in the big GDSfactory8 overhaul
-        thisRing.move(thisRing.center, gratingArray.ports[thisMiddlePort].center + np.array((-gratingPitch/2,-160.001)))
+        thisRing.dmove(dp2tuple(thisRing.dcenter), gratingArray.ports[thisMiddlePort].dcenter + np.array((-gratingPitch/2,-160)))
         uno_tools.naive_multiport_route(c, gratingArray, thisRing,  portMappings[i], waveguideXs)
     return c
 
@@ -213,4 +213,4 @@ def our_grating_TM(wgWidth):
     return c
 
 gf.clear_cache()
-full_chip().flatten_offgrid_references().show()
+full_chip().show()

@@ -5,8 +5,10 @@ import numpy as np
 
 def naive_multiport_route(c, r1, r2, portMapping, xs):
     for thesePorts in portMapping:
-        c.add(gf.routing.get_route(
-            r1.ports[thesePorts[0]], r2.ports[thesePorts[1]], cross_section = xs).references)
+        gf.routing.route_single(c, 
+            r1.ports[thesePorts[0]], 
+            r2.ports[thesePorts[1]], 
+            cross_section = xs)
 
 def count_optical_ports(componentIn):
     # count # of ports that start with 'o'
@@ -32,8 +34,8 @@ def offset_waveguide(componentIn, offsetDistance):
 
 @gf.cell
 def generic_2port(dutComponent: gf.Component, 
-                  straight1 = 500e3, # length of straight waveguide before component
-                  dxdy = (1000e3,1000e3), # location of 2nd coupler along x axis, and
+                  straight1 = 500e0, # length of straight waveguide before component
+                  dxdy = (1000e0,1000e0), # location of 2nd coupler along x axis, and
                                       # location of 1st coupler along y axis, resp.
                   wgWidth = None, # routing waveguide width
                   labelIn = None, # input edge coupler label
@@ -55,18 +57,16 @@ def generic_2port(dutComponent: gf.Component,
         dut.mirror((0,0), (0,1))
     if(rotateAngle != 0):
         dut.rotate(rotateAngle)
-    dut.move(dut.ports['o2'], (straight1, dxdy[1]))
+    dut.dmove(dut.ports['o2'].dcenter, (straight1, dxdy[1]))
     
     # edge couplers and routing
     ed = c << uno_wg.edge_coupler_pair(dxdy, wgWidth, labelIn, labelOut, tipWidth = tipWidth)
-    inRoute = gf.routing.get_route(ed.ports["o1"], dut.ports[portMappings[0]],
+    inRoute = gf.routing.route_single(c, ed.ports["o1"], dut.ports[portMappings[0]],
                                    radius=DEFAULT_RADIUS,
                                    cross_section=crossSection)
-    c.add(inRoute.references)
-    outRoute = gf.routing.get_route(ed.ports["o2"], dut.ports[portMappings[1]],
+    outRoute = gf.routing.route_single(c, ed.ports["o2"], dut.ports[portMappings[1]],
                                    radius=DEFAULT_RADIUS,
                                    cross_section=crossSection)
-    c.add(outRoute.references)
     c.with_uuid = True
     
     if(doLength):
@@ -74,17 +74,17 @@ def generic_2port(dutComponent: gf.Component,
         totalLength = dut.info["length"] + inRoute.length + outRoute.length
         c.info["length"] = totalLength
         c.name = f"{totalLength:.0f}umDelay"
-        c << gf.components.text(text = f"{1e3*wgWidth:.0f}nm/{1e-4*totalLength:.2f}cm", 
+        c << gf.components.text(text = f"{1e0*wgWidth:.0f}nm/{1e-4*totalLength:.2f}cm", 
                                 layer = LAYERS.ANNOTATION,
-                                position = (dut.center[0], dut.center[1]),
+                                position = (dut.dcenter.x, dut.dcenter.y),
                                 justify = "center",
-                                size = 25e3)
+                                size = 25e0)
     return c
 
 @gf.cell
 def generic_3port(dutComponent: gf.Component, # see generic_2port for variable definitions
-                    straightL = 500e3, 
-                    dxdy = (1000e3,1000e3), 
+                    straightL = 500e0, 
+                    dxdy = (1000e0,1000e0), 
                     wgWidth = None, 
                     edgeSep = DEFAULT_EDGE_SEP,
                     labelIn = None, 
@@ -110,19 +110,18 @@ def generic_3port(dutComponent: gf.Component, # see generic_2port for variable d
     if(putAfterBend):
         dut.rotate(-90)
         # find center point of two output ports
-        centerOutput = 0.5*(np.array(dut.ports[portMappings[1]].center) + np.array(dut.ports[portMappings[2]].center))
-        dut.move(centerOutput, (dxdy[0] + edgeSep/2, straightL))
+        centerOutput = 0.5*(np.array(dut.ports[portMappings[1]].dcenter) + np.array(dut.ports[portMappings[2]].dcenter))
+        dut.dmove(centerOutput, (dxdy[0] + edgeSep/2, straightL))
     else:
         
-        dut.move(dut.ports[portMappings[0]], (straightL, dxdy[1]))
+        dut.dmove(dut.ports[portMappings[0]].dcenter, (straightL, dxdy[1]))
     
     # edge couplers
     ed = c << uno_wg.edge_coupler_tri(dxdy, wgWidth, edgeSep, labelIn, labelOut, textPosition = textPosition, tipWidth = tipWidth)
     # routing
-    inRoute = gf.routing.get_route(ed.ports["o1"], dut.ports[portMappings[0]],
+    gf.routing.route_single(c, ed.ports["o1"], dut.ports[portMappings[0]],
                                    radius=DEFAULT_RADIUS,
                                    cross_section=crossSection)
-    c.add(inRoute.references)
     if(doBundleRoute):
         # do output routing as a bundle to avoid collisions?
         right_ports = [
@@ -131,7 +130,7 @@ def generic_3port(dutComponent: gf.Component, # see generic_2port for variable d
         left_ports = [
             dut.ports[portMappings[1]], dut.ports[portMappings[2]]
         ]
-        outRoutes = gf.routing.get_bundle(
+        gf.routing.route_bundle(c,
             left_ports,
             right_ports,
             sort_ports=True,
@@ -140,16 +139,15 @@ def generic_3port(dutComponent: gf.Component, # see generic_2port for variable d
             cross_section = crossSection,
             radius = DEFAULT_RADIUS
         )
-        for route in outRoutes:
-            c.add(route.references)
     else:
-        outRoute1 = gf.routing.get_route(ed.ports["o2"], dut.ports[portMappings[1]],
+        gf.routing.route_single(c, ed.ports["o2"], dut.ports[portMappings[1]],
                                        radius=DEFAULT_RADIUS,
                                        cross_section=crossSection)
-        c.add(outRoute1.references)
-        outRoute2 = gf.routing.get_route(ed.ports["o3"], dut.ports[portMappings[2]],
+        gf.routing.route_single(c, ed.ports["o3"], dut.ports[portMappings[2]],
                                        radius=DEFAULT_RADIUS,
                                        cross_section=crossSection)
-        c.add(outRoute2.references)
     c.with_uuid = True
     return c
+
+def dp2tuple(this_point : gf.kdb.DPoint):
+    return (this_point.x, this_point.y)
