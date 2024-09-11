@@ -92,105 +92,97 @@ def gen_racetrack(numCouplers, # must be 1 or 2
                     ):
     c = gf.Component()
     crossSection = waveguide_xs(wgWidth)
-    # using this GDSfactory stock coupler ended up being kinda a bad idea
-    # we have to use a two-waveguide cross section in coupling areas
-    # which is not very elegant, in my opinion
     leadDxDy = (20e0,7.5e0) if leadDxDy is None else leadDxDy
-    half_coupler = gf.components.coupler_asymmetric(gap = thisGap, 
+    half_coupler = uno_wg.coupler_asymmetric(gap = thisGap, 
                                                     cross_section = crossSection,
                                                     dx = couplerDx, dy = couplerDy)
     # # place bottom ring couplers
     c1 = c << half_coupler
     c2 = c << half_coupler
-    # c2.dmirror_x()
+    c2.dmirror_x()
     # # add coupling length
-    # c2.dmove(c2.ports['o1'].dcenter, c1.ports['o1'].dcenter)
-    # c1.dmove((couplingLength, 0))
-    # coupling cross section
-    centerToCenter = wgWidth + thisGap
-    s0 = gf.Section(width=wgWidth, offset=centerToCenter/2, layer=(1, 0), port_names=("o1", "o2"))
-    s1 = gf.Section(width=wgWidth, offset=-centerToCenter/2, layer=(1, 0))
-    couplerSection = gf.CrossSection(sections=[s0, s1])#, width = 2*wgWidth + thisGap)
-    # # there is a bug in route_single that requires us to specify a radius here?
-    # DUMMY_RADIUS = 5
-    s1 = c << gf.components.straight(length = couplingLength, cross_section = couplerSection)
+    c2.dmove(c2.ports['o1'].dcenter, c1.ports['o1'].dcenter)
+    c1.dmove((couplingLength, 0))
+
+    # coupling region straight wgs
+    s1 = c << gf.components.straight(length = couplingLength, cross_section = crossSection)
     s1.connect('o1', c1.ports['o1'])
-    # s2 = c << gf.components.straight(length = couplingLength, cross_section = crossSection)
-    # s2.connect('o1', c2.ports['o2'])
-    #gf.routing.route_single(c, c1.ports["o4"], c2.ports["o1"], cross_section=crossSection)
+    s2 = c << gf.components.straight(length = couplingLength, cross_section = crossSection)
+    s2.connect('o1', c1.ports['o0'])
 
+    # create most basic unit of the ring manually for APPROX length
+    ringBend = gf.path.euler(radius = eulerRadius, angle = -180)
+    totStraightLength = ringLength - 2*ringBend.length() - 2*couplingLength - 4*couplerDy
+    ringPathStraight = gf.path.straight(length = totStraightLength/4)
+    baseRingPath = ringPathStraight + ringBend + ringPathStraight
+    p1 = c << gf.path.extrude(baseRingPath, cross_section = crossSection)
+    p2 = c << gf.path.extrude(baseRingPath.dmirror(), cross_section = crossSection)
+    p1.dmirror_x() 
+    p2.dmirror_x() # I dare you to try and change/simplify the double mirror on p2
 
-    # # create most basic unit of the ring manually for APPROX length
-    # ringBend = gf.path.euler(radius = eulerRadius, angle = -180)
-    # totStraightLength = ringLength - 2*ringBend.length() - 2*couplingLength - 4*couplerDy
-    # ringPathStraight = gf.path.straight(length = totStraightLength/4)
-    # baseRingPath = ringPathStraight + ringBend + ringPathStraight
-    # p1 = c << gf.path.extrude(baseRingPath, cross_section = crossSection)
-    # p2 = c << gf.path.extrude(baseRingPath.dmirror(), cross_section = crossSection)
-    # p1.dmirror_x() 
-    # p2.dmirror_x() # I dare you to try and change/simplify the double mirror on p2
-
-    # # move ring paths in place
-    # p1.connect('o1', destination=c1.ports['o2'])
-    # p2.connect('o1', destination=c2.ports['o2'])
+    # move ring paths in place
+    p1.connect('o1', c1.ports['o3'])
+    p2.connect('o1', c2.ports['o3'])
     
-    # # add the two optical ports that will be same in either case
-    # c.add_port('o1', port = c1.ports['o3'])
-    # c.add_port('o2', port = c2.ports['o3'])
+    # add the two optical ports that will be same in either case
+    c.add_port('o1', port = c1.ports['o2'])
+    c.add_port('o2', port = c2.ports['o2'])
 
-    # if(numCouplers == 1):
-    #     # close ring with waveguide
-    #     gf.routing.route_single(c, p1.ports['o2'], p2.ports['o2'], cross_section=crossSection, radius = DUMMY_RADIUS)
-    # elif(numCouplers == 2):
-    #     # close ring with coupler
-    #     c3 = c << half_coupler
-    #     c3.dmirror()
-    #     c4 = c << half_coupler
-    #     c3.connect('o2', destination=p1.ports['o2'])
-    #     c4.connect('o2', destination=p2.ports['o2'])
-    #     gf.routing.route_single(c, c3.ports["o1"], c4.ports["o1"], cross_section=couplerSection, radius = DUMMY_RADIUS)
-    #     # add those extra ports
-    #     c.add_port('o3', port = c3.ports['o3'])
-    #     c.add_port('o4', port = c4.ports['o3']) 
-    # else:
-    #     raise Exception("numCouplers must be 1 or 2!")
+    if(numCouplers == 1):
+        print(1)
+        # close ring with waveguide
+        gf.routing.route_single(c, p1.ports['o2'], p2.ports['o2'])
+    elif(numCouplers == 2):
+        # close ring with coupler
+        c3 = c << half_coupler
+        c3.dmirror()
+        c4 = c << half_coupler
+        c3.connect('o3', destination=p1.ports['o2'])
+        c4.connect('o3', destination=p2.ports['o2'])
+        gf.routing.route_single(c, c3.ports["o1"], c4.ports["o1"])
+        gf.routing.route_single(c, c3.ports["o0"], c4.ports["o0"])
+        # add those extra ports
+        c.add_port('o3', port = c3.ports['o2'])
+        c.add_port('o4', port = c4.ports['o2']) 
+    else:
+        raise Exception("numCouplers must be 1 or 2!")
 
-    # if includeHeater:
+    if includeHeater:
         
-    #     # now can use same paths + route strategy for heater
-    #     heaterSection = gf.CrossSection(sections = [gf.Section(width = heaterWidth, layer = LAYERS.HEATER, port_names = ("e1", "e2"))])
-    #     h1 = c << gf.path.extrude(baseRingPath, cross_section = heaterSection)
-    #     h1.dmove(h1.ports['e1'].dcenter, p2.ports['o2'].dcenter)
+        # now can use same paths + route strategy for heater
+        heaterSection = gf.CrossSection(sections = [gf.Section(width = heaterWidth, layer = LAYERS.HEATER, port_names = ("e1", "e2"))])
+        h1 = c << gf.path.extrude(baseRingPath, cross_section = heaterSection)
+        h1.dmove(h1.ports['e1'].dcenter, p2.ports['o2'].dcenter)
         
-    #     # now add leads, which are L-shaped
-    #     lPath = gf.path.Path([(0,0),(leadDxDy[0],0),leadDxDy])
-    #     elecL = gf.path.extrude(lPath, heaterSection)
-    #     l1 = c << elecL
-    #     l2 = c << elecL 
-    #     l2.dmirror_x()
-    #     # what we do with these leads depends on if we're using a half-ring heater or not
-    #     if halfRingHeater:
-    #         l1.connect('e1', h1.ports['e1'])
-    #         l2.connect('e1', h1.ports['e2'])
-    #     else:
-    #         # this is kinda insane but using a dummy Component for objects that will be the subject of a boolean operation later
-    #         # i.e. we have cast those original components to a ghost dimension
-    #         c2 = gf.Component()
-    #         h2 = c2 << gf.path.extrude(baseRingPath, cross_section = heaterSection)
-    #         h2.rotate(180)
-    #         h2.dmove(h2.ports['e2'].dcenter, p1.ports['o2'].dcenter)
-    #         c.add(gf.routing.get_route(h1.ports["e1"], h2.ports["e2"], cross_section=heaterSection).references)
-    #         c.add(gf.routing.get_route(h1.ports["e2"], h2.ports["e1"], cross_section=heaterSection).references)
-    #         # to form leads, use boolean operation to cut a chunk out of one side, then add leads
-    #         subtrBlock = c2 << gf.components.rectangle(size = (h2.size[0], leadSep), layer = LAYERS.HEATER)
-    #         # move to a spot that it's (almost) guaranteed to overlap fully
-    #         subtrBlock.dmove((subtrBlock.dcenter.x, subtrBlock.dcenter.y), np.array(h2.dcenter) + np.array((.1,0)))    
-    #         h2_cut = c << gf.geometry.boolean(h2, subtrBlock, 'A-B', layer = LAYERS.HEATER)
-    #         l1.dmove((l1.dxmin, l1.dymin), (h2_cut.dxmax - heaterWidth, subtrBlock.dymax))
-    #         l2.dmove((l2.dxmin, l2.dymax), (h2_cut.dxmax - heaterWidth, subtrBlock.dymin))
+        # now add leads, which are L-shaped
+        lPath = gf.path.Path([(0,0),(leadDxDy[0],0),leadDxDy])
+        elecL = gf.path.extrude(lPath, heaterSection)
+        l1 = c << elecL
+        l2 = c << elecL 
+        l2.dmirror_y()
+        # what we do with these leads depends on if we're using a half-ring heater or not
+        if halfRingHeater:
+            l1.connect('e1', h1.ports['e1'])
+            l2.connect('e1', h1.ports['e2'])
+        else:
+            # this is kinda insane but using a dummy Component for objects that will be the subject of a boolean operation later
+            # i.e. we have cast those original components to a ghost dimension
+            c2 = gf.Component()
+            h2 = c2 << gf.path.extrude(baseRingPath, cross_section = heaterSection)
+            h2.drotate(180)
+            h2.dmove(h2.ports['e2'].dcenter, p1.ports['o2'].dcenter)
+            gf.routing.route_single_electrical(c, h1.ports["e1"], h2.ports["e2"], cross_section=heaterSection)
+            gf.routing.route_single_electrical(c, h1.ports["e2"], h2.ports["e1"], cross_section=heaterSection)
+            # to form leads, use boolean operation to cut a chunk out of one side, then add leads
+            subtrBlock = c2 << gf.components.rectangle(size = (h2.dsize_info.width, leadSep), layer = LAYERS.HEATER)
+            # move to a spot that it's (almost) guaranteed to overlap fully
+            subtrBlock.dmove((subtrBlock.dcenter.x, subtrBlock.dcenter.y), (h2.dcenter.x + .1,h2.dcenter.y))    
+            h2_cut = c << gf.boolean(h2, subtrBlock, 'A-B', layer = LAYERS.HEATER)
+            l1.dmove((l1.dxmin, l1.dymin), (h2_cut.dxmax - heaterWidth, subtrBlock.dymax))
+            l2.dmove((l2.dxmin, l2.dymax), (h2_cut.dxmax - heaterWidth, subtrBlock.dymin))
        
-    #     c.add_port('e1', port = l1.ports['e2'])
-    #     c.add_port('e2', port = l2.ports['e2'])
+        c.add_port('e1', port = l1.ports['e2'])
+        c.add_port('e2', port = l2.ports['e2'])
     
     # #print(totalLength)
     # totalLength = (2*baseRingPath.length() + 4*couplerDy 

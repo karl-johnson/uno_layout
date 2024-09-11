@@ -11,7 +11,7 @@ from uno_layout.tools import dp2tuple
 dieWidth = 12000e0
 desWidth = 8000e0
 logoFile = "uno_layout/examples/kj.gds"
-globalWgWidth = 0.450e0
+globalWgWidth = 0.50e0
 
 @gf.cell
 def full_chip():
@@ -146,14 +146,14 @@ def sixteen_grating_3_rings(gratingComponent,
         {"dx": (numGratings+1)*gratingPitch},
         {"y": loopback_y1},
         {"dx": -gratingPitch}
-        ],
-        cross_section = waveguideXs
-        )
+        ])#,
+        #cross_section = waveguideXs
+        #)
     
     
     gf.routing.route_single(c,
-        gratingArray.ports["o7"], gratingArray.ports['o8'], cross_section = waveguideXs
-        )
+        gratingArray.ports["o7"], gratingArray.ports['o8'])#, cross_section = waveguideXs
+        #)
     
     # on a 16-port ring, room for 3 add-drop rings on (2,3,4,5), (6,7,10,11), (12,13,14,15)
 

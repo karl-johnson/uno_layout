@@ -39,13 +39,13 @@ DEFAULT_EDGE_SEP = 100
 DEFAULT_TEXT_SIZE = 25
 DEFAULT_DXDY = (1000e0,1000e0)
 
-def waveguide_xs(wgWidth = DEFAULT_WG_WIDTH):
+def waveguide_xs(width = DEFAULT_WG_WIDTH):
     # returns a simple waveguide cross-section so we don't have to deal with
     # annoying Section and CrossSection synax all the time
     # default if passed None:
-    wgWidth = DEFAULT_WG_WIDTH if wgWidth is None else wgWidth
+    width = DEFAULT_WG_WIDTH if width is None else width
     s0 = gf.Section(
-        width=wgWidth,
+        width=width,
         layer= LAYERS.WG,
         port_names=("o1", "o2"))
     return gf.CrossSection(sections = [s0], radius = DEFAULT_RADIUS)

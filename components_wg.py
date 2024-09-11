@@ -17,7 +17,7 @@ def coupler_asymmetric(
     gap: float = 0.234,
     dy: float = 2.5,
     dx: float = 10.0,
-    cross_section: gf.CrossSectionSpec = waveguide_xs(DEFAULT_WG_WIDTH),
+    cross_section = waveguide_xs(DEFAULT_WG_WIDTH),
 ) -> gf.Component:
     """Bend coupled to straight waveguide.
 
@@ -41,7 +41,7 @@ def coupler_asymmetric(
     x = gf.get_cross_section(cross_section)
     width = x.width
     bend = gf.components.bend_s(size=(dx, dy - gap - width), cross_section=cross_section)
-    wg = gf.straight(cross_section=cross_section)
+    wg = gf.components.straight(cross_section=cross_section)
 
     w = bend.ports[0].dwidth
     y = (w + gap) / 2
@@ -63,10 +63,10 @@ def coupler_asymmetric(
     #     orientation=180,
     #     cross_section=x,
     # )
-    c.add_port(name="o3", port=bend.ports[1])
-    c.add_port(name="o2", port=wg.ports[0])
-    c.add_port(name="o1", port=bend.ports[0])
-    c.add_port(name="o0", port=wg.ports[1])
+    c.add_port(name="o0", port=bend.ports[0])
+    c.add_port(name="o1", port=wg.ports[0])
+    c.add_port(name="o2", port=bend.ports[1])
+    c.add_port(name="o3", port=wg.ports[1])
     
     c.flatten()
     return c
@@ -101,7 +101,7 @@ def apodized_grating_coupler_rectangular(
         width_grating = width_grating,
         length_taper = length_taper,
         layer_grating = LAYERS.WG,
-        cross_section=waveguide_xs(wg_width),
+        cross_section=waveguide_xs,
         layer_slab = False)
 
 @gf.cell
