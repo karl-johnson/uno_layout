@@ -1,7 +1,15 @@
 import gdsfactory as gf
-from uno_layout import LAYERS, DEFAULT_RADIUS, DEFAULT_EDGE_SEP, waveguide_xs
+#from uno_layout import LAYERS, DEFAULT_RADIUS, DEFAULT_EDGE_SEP, waveguide_xs
 import uno_layout.components_wg as uno_wg
 import numpy as np
+
+from uno_layout import Settings, LayerMapUNO, waveguide_xs
+LAYERS = LayerMapUNO
+DEFAULT_WG_WIDTH = Settings.DEFAULT_WG_WIDTH
+DEFAULT_RADIUS = Settings.DEFAULT_RADIUS
+DEFAULT_EDGE_SEP = Settings.DEFAULT_EDGE_SEP
+DEFAULT_TEXT_SIZE = Settings.DEFAULT_TEXT_SIZE
+DEFAULT_DXDY = Settings.DEFAULT_DXDY
 
 def naive_multiport_route(c, r1, r2, portMapping, xs):
     for thesePorts in portMapping:

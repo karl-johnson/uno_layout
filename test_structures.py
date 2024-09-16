@@ -1,14 +1,21 @@
 import gdsfactory as gf
-from uno_layout import LAYERS, DEFAULT_WG_WIDTH, DEFAULT_EDGE_SEP, DEFAULT_ROUTE_WIDTH
+#from uno_layout import LAYERS, DEFAULT_WG_WIDTH, DEFAULT_EDGE_SEP, DEFAULT_ROUTE_WIDTH
 import uno_layout.components_wg as uno_wg
 import uno_layout.components_heater as uno_ht
+from uno_layout import Settings, LayerMapUNO, waveguide_xs
+LAYERS = LayerMapUNO
+DEFAULT_WG_WIDTH = Settings.DEFAULT_WG_WIDTH
+DEFAULT_RADIUS = Settings.DEFAULT_RADIUS
+DEFAULT_EDGE_SEP = Settings.DEFAULT_EDGE_SEP
+DEFAULT_TEXT_SIZE = Settings.DEFAULT_TEXT_SIZE
+DEFAULT_DXDY = Settings.DEFAULT_DXDY
 
 @gf.cell
 def boschGapTest(tWidthList, 
-                 dx = 1000e0, 
-                 dy = 1000e0, 
-                 tLength = 500e0, 
-                 bridge = 50e0):
+                 dx = 1000, 
+                 dy = 1000, 
+                 tLength = 500, 
+                 bridge = 50):
     c = gf.Component()
     thisDx = dx
     thisDy = dy
@@ -17,17 +24,17 @@ def boschGapTest(tWidthList,
         thisRect = c << gf.components.rectangle(size = (tWidth, tLength), 
                                                 layer = LAYERS.BOSCH, 
                                                 centered = True)
-        thisRect.dmove((thisDx, thisDy))
+        thisRect.move((thisDx, thisDy))
         thisDx += tWidth/2 + bridge
     return c
 
 @gf.cell
 def boschBridgeTest(tBridgeList,
-                    tLength = 500e0,
-                    tWidth = 100e0,
-                    dx = 3100e0,
-                    wdy = 3100e0,
-                    rdy = 500e0,
+                    tLength = 500,
+                    tWidth = 100,
+                    dx = 3100,
+                    wdy = 3100,
+                    rdy = 500,
                     wgWidth = DEFAULT_WG_WIDTH,
                     edgeSep = DEFAULT_EDGE_SEP):
     # run waveguides through bosch "bridges" to see what's safe
@@ -42,7 +49,7 @@ def boschBridgeTest(tBridgeList,
     thisRect = c << gf.components.rectangle(size = (tWidth, tLength), 
                                             layer = LAYERS.BOSCH, 
                                             centered = True)
-    thisRect.dmove((rectDx, rectDy))
+    thisRect.move((rectDx, rectDy))
     rectDx += tWidth
     wgDx += tWidth/2
     
@@ -52,7 +59,7 @@ def boschBridgeTest(tBridgeList,
         thisRect = c << gf.components.rectangle(size = (tWidth, tLength), 
                                                 layer = LAYERS.BOSCH, 
                                                 centered = True)
-        thisRect.dmove((rectDx, rectDy))
+        thisRect.move((rectDx, rectDy))
         rectDx += tWidth
         wgDx += tBridge/2
         c << uno_wg.straight_waveguide(wgDx, wgDy, wgWidth,
@@ -63,12 +70,12 @@ def boschBridgeTest(tBridgeList,
     return c
 
 @gf.cell
-def routingTestStructure(padSep = 1000e0, width = DEFAULT_ROUTE_WIDTH):
+def routingTestStructure(padSep = 1000, width = DEFAULT_ROUTE_WIDTH):
     c = gf.Component()
     p1 = c << uno_ht.rectPad()
     p2 = c << uno_ht.rectPad()
     p2.rotate(180)
-    p2.dmove((0, padSep))
+    p2.move((0, padSep))
     thisSection = gf.cross_section.cross_section(width = width, 
                                                  layer = LAYERS.ROUTING)
     route = gf.routing.get_route_electrical(
@@ -79,14 +86,14 @@ def routingTestStructure(padSep = 1000e0, width = DEFAULT_ROUTE_WIDTH):
     return c
 
 @gf.cell
-def straightHeaterTestStructure(padSep = 1000e0, heaterLength = 500e0, width = 25e0):
+def straightHeaterTestStructure(padSep = 1000, heaterLength = 500, width = 25):
     c = gf.Component()
     p1 = c << uno_ht.rectPad()
     p2 = c << uno_ht.rectPad()
     p2.rotate(180)
-    p2.dmove((0, padSep))
+    p2.move((0, padSep))
     h = c << uno_ht.rect_heater(heaterLength, width)
-    h.dmove((0, padSep/2))
+    h.move((0, padSep/2))
     thisSection = gf.cross_section.cross_section(width = max(width, DEFAULT_ROUTE_WIDTH), 
                                                  layer = LAYERS.ROUTING)
     c.add(gf.routing.get_route_electrical(
@@ -98,14 +105,14 @@ def straightHeaterTestStructure(padSep = 1000e0, heaterLength = 500e0, width = 2
     return c
 
 @gf.cell
-def snakeHeaterTestStructure(padSep = 1000e0, hLength = 500e0, hNum = 7, hSpacing = 25e0, width = 10e0):
+def snakeHeaterTestStructure(padSep = 1000, hLength = 500, hNum = 7, hSpacing = 25, width = 10):
     c = gf.Component()
     p1 = c << uno_ht.rectPad()
     p2 = c << uno_ht.rectPad()
     p2.rotate(180)
-    p2.dmove((0, padSep))
+    p2.move((0, padSep))
     h = c << uno_ht.snake_heater(hLength, hNum, hSpacing, width)
-    h.dmove((0, padSep/2))
+    h.move((0, padSep/2))
     thisSection = gf.cross_section.cross_section(width = max(width, DEFAULT_ROUTE_WIDTH), 
                                                  layer = LAYERS.ROUTING)
     c.add(gf.routing.get_route_electrical(

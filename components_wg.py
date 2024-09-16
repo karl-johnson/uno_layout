@@ -5,7 +5,14 @@ from math import cos, sin, floor, sqrt, pi, ceil
 import scipy.stats
 import random
 import gdsfactory as gf
-from uno_layout import LAYERS, DEFAULT_WG_WIDTH, DEFAULT_RADIUS, DEFAULT_TEXT_SIZE, DEFAULT_DXDY, waveguide_xs
+from uno_layout import Settings, LayerMapUNO, waveguide_xs
+LAYERS = LayerMapUNO
+DEFAULT_WG_WIDTH = Settings.DEFAULT_WG_WIDTH
+DEFAULT_RADIUS = Settings.DEFAULT_RADIUS
+DEFAULT_EDGE_SEP = Settings.DEFAULT_EDGE_SEP
+DEFAULT_TEXT_SIZE = Settings.DEFAULT_TEXT_SIZE
+DEFAULT_DXDY = Settings.DEFAULT_DXDY
+
 
 DEFAULT_BOSCH_WIDTH = 300e0
 DEFAULT_DES_WIDTH = 8000e0
@@ -75,7 +82,7 @@ def coupler_asymmetric(
 def apodized_grating_coupler_rectangular(
         wg_width = 0.5e0, 
         fiber_angle = 12e0, 
-        N = 30e0, 
+        N = 30, 
         F0 = 0.9e0, 
         R = 0.025e0, 
         lambda_c = 1.55e0, # um 

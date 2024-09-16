@@ -2,18 +2,32 @@ import gdsfactory as gf
 from gdsfactory.technology import LayerMap
 from gdsfactory.typings import Layer
 
-
 """ Library of common tools and components for waveguide layout in UCSD UNO group.
  Also includes standard layer assignments etc, similar to Applied Nanotools'
- This version of the library is made for GDSfactory 8 and uses nm units!
  Naming conventions:
      classes: CapWords
      functions: lowercase_with_underscores
      local variables: camelCase (for legacy reasons)
 """
-    
+class Settings:
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(Settings, cls).__new__(cls)
+        return cls.instance
+    # recommended way to reference layers: from uno_layout import LAYERS
+    # then you can simply do LAYERS.WG etc everywhere
+    DEFAULT_WG_WIDTH = 0.5
+    DEFAULT_RADIUS = 25
+    DEFAULT_EDGE_SEP = 100
+    DEFAULT_ROUTE_WIDTH = 25
+    DEFAULT_TEXT_SIZE = 50
+    DEFAULT_DXDY = 30
 
-class LayerMapUNO(LayerMap):
+class LayerMapUNO:#(LayerMap):
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(LayerMapUNO, cls).__new__(cls)
+        return cls.instance
     # this is the recommended way to reference layers. 
     WG: Layer = (1,0) # waveguide
     LABEL: Layer = (2,0) # waveguide-layer labels written at a lower E beam res
@@ -30,34 +44,30 @@ class LayerMapUNO(LayerMap):
     ANT_THERMAL_TRENCH: Layer = (203, 0)
     ANNOTATION: Layer = (210, 0) # gds-only annotations, not printed
 
-LAYERS = LayerMapUNO
-# recommended way to reference layers: from uno_layout import LAYERS
-# then you can simply do LAYERS.WG etc everywhere
-DEFAULT_WG_WIDTH = 0.500
-DEFAULT_RADIUS = 15
-DEFAULT_EDGE_SEP = 100
-DEFAULT_TEXT_SIZE = 25
-DEFAULT_DXDY = (1000e0,1000e0)
 
-def waveguide_xs(width = DEFAULT_WG_WIDTH):
+def waveguide_xs(width=None, layer=None, radius=None):
+    width = Settings.DEFAULT_WG_WIDTH if width is None else width
+    layer = LayerMapUNO.WG if layer is None else layer
+    radius = Settings.DEFAULT_RADIUS if radius is None else radius
     # returns a simple waveguide cross-section so we don't have to deal with
     # annoying Section and CrossSection synax all the time
     # default if passed None:
-    width = DEFAULT_WG_WIDTH if width is None else width
+    #wgWidth = DEFAULT_WG_WIDTH if wgWidth is None else wgWidth
     s0 = gf.Section(
         width=width,
-        layer= LAYERS.WG,
-        port_names=("o1", "o2"))
-    return gf.CrossSection(sections = [s0], radius = DEFAULT_RADIUS)
+        layer= LayerMapUNO.WG,
+        port_names=("o1", "o2"),
+        name = "Wvg")
+    return gf.CrossSection(sections = [s0], radius = radius)
 
 
-DEFAULT_ROUTE_WIDTH = 25000
 
-def routing_xs(rtWidth = DEFAULT_ROUTE_WIDTH):
+
+def routing_xs(rtWidth = Settings.DEFAULT_ROUTE_WIDTH):
     # default if passed None:
-    rtWidth = DEFAULT_ROUTE_WIDTH if rtWidth is None else rtWidth
+    rtWidth = Settings.DEFAULT_ROUTE_WIDTH if rtWidth is None else rtWidth
     return gf.cross_section.cross_section(width = rtWidth, 
-                                   layer = LAYERS.ROUTING,
+                                   layer = Settings.LAYERS.ROUTING,
                                    port_names=('e0', 'e1'),
                                    port_types=('electrical', 'electrical'))
-    
+

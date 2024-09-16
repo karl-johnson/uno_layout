@@ -2,10 +2,19 @@ import gdsfactory as gf
 import uno_layout.components_wg as uno_wg
 import uno_layout.tools as uno_tools
 import uno_layout.common_wg_devices as uno_wgd
-from uno_layout import waveguide_xs, LAYERS
+#from uno_layout import waveguide_xs, LAYERS
 import numpy as np
 from functools import partial
 from uno_layout.tools import dp2tuple
+
+from uno_layout import Settings, LayerMapUNO, waveguide_xs
+LAYERS = LayerMapUNO
+DEFAULT_WG_WIDTH = Settings.DEFAULT_WG_WIDTH
+DEFAULT_RADIUS = Settings.DEFAULT_RADIUS
+DEFAULT_EDGE_SEP = Settings.DEFAULT_EDGE_SEP
+DEFAULT_TEXT_SIZE = Settings.DEFAULT_TEXT_SIZE
+DEFAULT_DXDY = Settings.DEFAULT_DXDY
+
 
 
 dieWidth = 12000e0

@@ -1,8 +1,15 @@
 import gdsfactory as gf
-from uno_layout import LAYERS, DEFAULT_WG_WIDTH, DEFAULT_RADIUS, DEFAULT_EDGE_SEP, DEFAULT_TEXT_SIZE, waveguide_xs
+from uno_layout import Settings, LayerMapUNO, waveguide_xs
 import uno_layout.components_wg as uno_wg
 import numpy as np
 import uno_layout.tools as uno_tools
+LAYERS = LayerMapUNO
+DEFAULT_WG_WIDTH = Settings.DEFAULT_WG_WIDTH
+DEFAULT_RADIUS = Settings.DEFAULT_RADIUS
+DEFAULT_EDGE_SEP = Settings.DEFAULT_EDGE_SEP
+DEFAULT_TEXT_SIZE = Settings.DEFAULT_TEXT_SIZE
+DEFAULT_DXDY = Settings.DEFAULT_DXDY
+
 
 @gf.cell
 def dirPolSplitter(xsIn, gapIn = 450, lengthIn = 15000, numStages = 3000, 
@@ -137,10 +144,10 @@ def gen_racetrack(numCouplers, # must be 1 or 2
         c3 = c << half_coupler
         c3.dmirror()
         c4 = c << half_coupler
-        c3.connect('o3', destination=p1.ports['o2'])
-        c4.connect('o3', destination=p2.ports['o2'])
-        gf.routing.route_single(c, c3.ports["o1"], c4.ports["o1"])
-        gf.routing.route_single(c, c3.ports["o0"], c4.ports["o0"])
+        c3.connect('o3', p1.ports['o2'])
+        c4.connect('o3', p2.ports['o2'])
+        gf.routing.route_single(c, c3.ports["o1"], c4.ports["o1"],cross_section=waveguide_xs)
+        gf.routing.route_single(c, c3.ports["o0"], c4.ports["o0"],cross_section=waveguide_xs)
         # add those extra ports
         c.add_port('o3', port = c3.ports['o2'])
         c.add_port('o4', port = c4.ports['o2']) 
