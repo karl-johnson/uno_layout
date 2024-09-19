@@ -89,7 +89,8 @@ def apodized_grating_coupler_rectangular(
         no = 2.69e0, 
         ne = 1.444e0,
         width_grating = 20e0, 
-        length_taper = 300e0):
+        length_taper = 300e0,
+        polarization = 'te'):
     curr_pos = 0
     widths = []
     gaps = []
@@ -109,7 +110,8 @@ def apodized_grating_coupler_rectangular(
         length_taper = length_taper,
         layer_grating = LAYERS.WG,
         cross_section=waveguide_xs,
-        layer_slab = False)
+        layer_slab = False,
+        polarization = polarization)
 
 @gf.cell
 def mode_filter(wgWidth = DEFAULT_WG_WIDTH,

@@ -159,3 +159,34 @@ def generic_3port(dutComponent: gf.Component, # see generic_2port for variable d
 
 def dp2tuple(this_point : gf.kdb.DPoint):
     return (this_point.x, this_point.y)
+
+def display_manifest_ports():
+    # read a test manifest CSV and export GDS that we can overlay onto layout
+    # to show the port locations
+    # this information is much more easily accessible using the gdsfactory 
+    # object itself, but the purpose of this function is to verify the exported
+    # csv
+    
+    
+    c = gf.Component()
+    
+    
+    
+    return c
+
+def read_ports_from_manifest():
+    return None
+
+@gf.cell
+def port_indicator():
+    # marker for display_manifest_ports
+    c = gf.Component()
+    
+    
+    
+    return c
+    
+    
+    
+    
+    
