@@ -113,6 +113,39 @@ def apodized_grating_coupler_rectangular(
         layer_slab = False,
         polarization = polarization)
 
+@gf.cell 
+def apodized_grating_coupler_focused(
+        wg_width = 0.5e0, 
+        fiber_angle = 12e0, 
+        N = 30, 
+        F0 = 0.9e0, 
+        R = 0.025e0, 
+        lambda_c = 1.55e0, # um 
+        no = 2.69e0, 
+        ne = 1.444e0,
+        length_taper = 50e0,
+        polarization = 'te'):
+    curr_pos = 0
+    widths = []
+    gaps = []
+    for i in range(N):
+        F = F0 - R*curr_pos
+        this_neff = F*no + (1-F)*ne  
+        this_period = lambda_c / (this_neff - sin(fiber_angle/180*pi)) 
+        widths.append(F * this_period)
+        gaps.append((1-F) * this_period)
+        curr_pos = curr_pos + this_period
+    
+    
+    return gf.components.grating_coupler_elliptical_arbitrary(
+        gaps = gaps, 
+        widths = widths,
+        taper_length = length_taper,
+        layer_grating = LAYERS.WG,
+        cross_section=waveguide_xs,
+        layer_slab = False,
+        polarization = polarization)
+
 @gf.cell
 def mode_filter(wgWidth = DEFAULT_WG_WIDTH,
                 radius = DEFAULT_RADIUS):
