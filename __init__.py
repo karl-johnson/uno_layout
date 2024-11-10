@@ -22,6 +22,7 @@ class Settings:
     DEFAULT_ROUTE_WIDTH = 25
     DEFAULT_TEXT_SIZE = 50
     DEFAULT_DXDY = 30
+    DEFAULT_GRATING_DIST = 250
 
 class LayerMapUNO:#(LayerMap):
     def __new__(cls):
