@@ -14,7 +14,7 @@ DEFAULT_GRATING_DIST = Settings.DEFAULT_GRATING_DIST
 
 
 @gf.cell
-def dirPolSplitter(xsIn, gapIn = 450, lengthIn = 15000, numStages = 3000, 
+def dir_pol_splitter(xsIn, gapIn = 450, lengthIn = 15000, numStages = 3000, 
                    coupDy = 4000, coupDx = 10000, stageDx = 70000, stageDy = 15000):
     # polarization splitter made by cascaded dir couplers
     # through is TE, cross is TM, as TM coupling coeff is much higher
@@ -204,7 +204,7 @@ def gen_racetrack(numCouplers, # must be 1 or 2
     return c
 
 @gf.cell
-def ringWithGratingCouplers(ring: gf.Component | gf.ComponentReference | dict = gen_racetrack(couplerDx=50,numCouplers=2,includeHeater=False),
+def ring_with_grating_couplers(ring: gf.Component | gf.ComponentReference | dict = gen_racetrack(couplerDx=50,numCouplers=2,includeHeater=False),
                              gratingCoupler: gf.Component | gf.ComponentReference | dict = None, Label = None):
     if type(ring) == dict:
         if "couplerDx" not in ring:
@@ -232,7 +232,7 @@ def ringWithGratingCouplers(ring: gf.Component | gf.ComponentReference | dict = 
     return c
 
 @gf.cell
-def alignmentStructure(gratingCoupler = None, Label = None):
+def two_grating_loopback(gratingCoupler = None, Label = None):
     c = gf.Component()
     c1 = c << gratingCoupler
     c1.drotate(-90)
