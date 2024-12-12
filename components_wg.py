@@ -6,12 +6,8 @@ import scipy.stats
 import random
 import gdsfactory as gf
 from uno_layout import Settings, LayerMapUNO, waveguide_xs
-LAYERS = LayerMapUNO
-DEFAULT_WG_WIDTH = Settings.DEFAULT_WG_WIDTH
-DEFAULT_RADIUS = Settings.DEFAULT_RADIUS
-DEFAULT_EDGE_SEP = Settings.DEFAULT_EDGE_SEP
+DEFAULT_EDGE_SEP = Settings.DEFAULT_EDGE_SEP # Not used yet
 DEFAULT_TEXT_SIZE = Settings.DEFAULT_TEXT_SIZE
-DEFAULT_DXDY = Settings.DEFAULT_DXDY
 
 
 DEFAULT_BOSCH_WIDTH = 300e0
@@ -24,7 +20,7 @@ def coupler_asymmetric(
     gap: float = 0.234,
     dy: float = 2.5,
     dx: float = 10.0,
-    cross_section = waveguide_xs(DEFAULT_WG_WIDTH),
+    cross_section = waveguide_xs(Settings.DEFAULT_WG_WIDTH),
 ) -> gf.Component:
     """Bend coupled to straight waveguide.
 
@@ -78,6 +74,41 @@ def coupler_asymmetric(
     c.flatten()
     return c
 
+@gf.cell
+def asymmetric_coupler(wgWidth = 0.5, couplingLength = 10.0, 
+                           couplerDx =10.0, couplerDy = 10.0, couplerGap = 0.5, busLen = 20.0, crossSection=None):
+    c = gf.Component()
+    if crossSection == None:
+        crossSection = waveguide_xs(wgWidth)
+    if callable(crossSection):
+        if wgWidth is not None:
+            crossSection = crossSection(width=wgWidth)
+        else:
+            crossSection = crossSection()
+    wgWidth = crossSection.width
+
+    if (busLen<couplingLength): couplingLength=couplingLength
+    
+    s1 = c << gf.components.straight(length=couplingLength, cross_section=crossSection)
+    s1.dmovex(-couplingLength/2)
+    s2 = c << gf.components.straight(length=busLen, cross_section=crossSection)
+    s2.dmovex(-busLen/2)
+    s1.dmovey((couplerGap + wgWidth)/2)
+    s2.dmovey(-(couplerGap + wgWidth)/2)
+
+    b1 = c << gf.components.bend_s(size=(couplerDx,couplerDy), cross_section=crossSection)
+    b2 = c << gf.components.bend_s(size=(couplerDx,couplerDy), cross_section=crossSection)
+    b2.mirror_x()
+    b1.connect("o1", s1.ports["o2"])
+    b2.connect("o1", s1.ports["o1"])
+    c.add_port(port=b2.ports['o2'],name="o1")
+    c.add_port(port=s2.ports['o1'],name="o2")
+    c.add_port(port=b1.ports['o2'],name="o3")
+    c.add_port(port=s2.ports['o2'],name="o4")
+    c.flatten(False)
+    return c
+
+
 @gf.cell 
 def apodized_grating_coupler_rectangular(
         wg_width = 0.5e0, 
@@ -90,7 +121,12 @@ def apodized_grating_coupler_rectangular(
         ne = 1.444e0,
         width_grating = 20e0, 
         length_taper = 300e0,
-        polarization = 'te'):
+        polarization = 'te',
+        layerSlab= None,
+        crossSection = None
+        ):
+    if crossSection is None:
+        crossSection = waveguide_xs
     curr_pos = 0
     widths = []
     gaps = []
@@ -101,16 +137,13 @@ def apodized_grating_coupler_rectangular(
         widths.append(F * this_period)
         gaps.append((1-F) * this_period)
         curr_pos = curr_pos + this_period
-    
-    
     return gf.components.grating_coupler_rectangular_arbitrary(
         gaps = gaps, 
         widths = widths,
         width_grating = width_grating,
         length_taper = length_taper,
-        layer_grating = LAYERS.WG,
-        cross_section=waveguide_xs,
-        layer_slab = False,
+        layer_slab = layerSlab,
+        cross_section=crossSection,
         polarization = polarization)
 
 @gf.cell 
@@ -124,7 +157,11 @@ def apodized_grating_coupler_focused(
         no = 2.69e0, 
         ne = 1.444e0,
         length_taper = 50e0,
-        polarization = 'te'):
+        crossSection = None,
+        polarization = 'te',
+        name = ""):
+    if crossSection is None:
+        crossSection = waveguide_xs
     curr_pos = 0
     widths = []
     gaps = []
@@ -141,14 +178,14 @@ def apodized_grating_coupler_focused(
         gaps = gaps, 
         widths = widths,
         taper_length = length_taper,
-        layer_grating = LAYERS.WG,
-        cross_section=waveguide_xs,
+        layer_grating = LayerMapUNO.WG,
+        cross_section=crossSection,
         layer_slab = False,
         polarization = polarization)
 
 @gf.cell
-def mode_filter(wgWidth = DEFAULT_WG_WIDTH,
-                radius = DEFAULT_RADIUS):
+def mode_filter(wgWidth = Settings.DEFAULT_WG_WIDTH,
+                radius = Settings.DEFAULT_RADIUS):
     # series of 4 bends to toss out any weakly-guided modes
     c = gf.Component()
     thisXs = waveguide_xs(wgWidth)
@@ -169,7 +206,7 @@ def mode_filter(wgWidth = DEFAULT_WG_WIDTH,
 def random_fill_naive(size = (100e0,50e0), # dimensions of region
                 postRad = 0.5e0, # radius of posts
                 density = 1e-4, # avg # of posts per sq micron
-                layer = LAYERS.WG,
+                layer = LayerMapUNO.WG,
                 seed = 0):
     # fill a region with random posts to scatter light
     c = gf.Component()
@@ -187,7 +224,7 @@ def random_fill_naive(size = (100e0,50e0), # dimensions of region
 def random_fill_poisson(size = (100e0,50e0), # dimensions of region
                 postRad = 0.5e0, # radius of posts
                 radius = 2.5e0, # attempted distance between posts
-                layer = LAYERS.WG,
+                layer = LayerMapUNO.WG,
                 seed = 0):
     # fill a region with random posts to scatter light
     c = gf.Component()
@@ -260,11 +297,11 @@ def die_and_floorplan(dieWidth = 10000e0, desWidth = DEFAULT_DES_WIDTH):
     # die
     c << gf.components.rectangle(
         size = [dieWidth, dieWidth], centered = True,
-        layer = LAYERS.DIE)
+        layer = LayerMapUNO.DIE)
     # design region
     c << gf.components.rectangle(
         size = [desWidth, desWidth], centered = True,
-        layer = LAYERS.FLOORPLAN)
+        layer = LayerMapUNO.FLOORPLAN)
     return c
 
 @gf.cell
@@ -276,15 +313,15 @@ def ant_4x4_template():
     # design region
     c << gf.components.rectangle(
         size = [desWidth, desWidth], centered = True,
-        layer = LAYERS.FLOORPLAN)
+        layer = LayerMapUNO.FLOORPLAN)
     # deep trench
     c << gf.components.rectangle(
         size = (desWidth,deepTrenchWidth), 
-        layer = LAYERS.ANT_EDGE_TRENCH, 
+        layer = LayerMapUNO.ANT_EDGE_TRENCH, 
         centered = True)
     c << gf.components.rectangle(
         size = (deepTrenchWidth,desWidth), 
-        layer = LAYERS.ANT_EDGE_TRENCH, 
+        layer = LayerMapUNO.ANT_EDGE_TRENCH, 
         centered = True)
     return c
 
@@ -296,7 +333,7 @@ def ant_trench_perimeter():
     for angle in [0, 90, 180, 270]:
         (c << gf.components.bbox(
             left = -outerWidth/2, bottom = innerWidth/2, top = outerWidth/2, right = outerWidth/2,
-            layer = LAYERS.ANT_EDGE_TRENCH)).rotate(angle)
+            layer = LayerMapUNO.ANT_EDGE_TRENCH)).rotate(angle)
     return c
 
 @gf.cell
@@ -320,7 +357,7 @@ def mla_cross(layer,
 @gf.cell
 def mla_crosses(dx = 4000e0, 
                 dy = 4000e0, 
-                thisLayer = LAYERS.LABEL,
+                thisLayer = LayerMapUNO.LABEL,
                 includeArrow = True):
     c = gf.Component()
     cross = mla_cross(layer = thisLayer)
@@ -340,7 +377,7 @@ def mla_crosses(dx = 4000e0,
     return c
 
 @gf.cell
-def arrow(height = 25e0, layer = LAYERS.LABEL):
+def arrow(height = 25e0, layer = LayerMapUNO.LABEL):
     c = gf.Component()
     arrowPolygon = height*np.array([[-0.2,-1], [0.2, -1], [0.2,0.6], [0.4,0.6], [0,1], [-0.4, 0.6], [-0.2, 0.6], [-0.2,0]])
     c.add_polygon(arrowPolygon, layer = layer)
@@ -354,10 +391,10 @@ def bosch_for_quadrants(boschWidth = DEFAULT_BOSCH_WIDTH,
     # Bosch deep trench zones
     c << gf.components.rectangle(
         size = (boschWidth, desWidth), centered=True,
-        layer = LAYERS.BOSCH)
+        layer = LayerMapUNO.BOSCH)
     c << gf.components.rectangle(
         size = (desWidth, boschWidth), centered=True, # alternative to rotate(90)
-        layer = LAYERS.BOSCH)
+        layer = LayerMapUNO.BOSCH)
     return c
 
 @gf.cell
@@ -365,12 +402,12 @@ def dicing_lanes(lanesX, # x coordinates of vertical dicing (list)
                  lanesY, # y coordinates of horizontal dicing (list)
                  bladeWidth = DEFAULT_DICE_WIDTH, # width of dicing blade
                  tickSeparation = DEFAULT_DES_WIDTH + 500e0, # location of dicing marks
-                 tickLayer = LAYERS.LABEL,
+                 tickLayer = LayerMapUNO.LABEL,
                  doBosch = True,
                  doCrosses = True,
                  boschWidth = DEFAULT_BOSCH_WIDTH,
                  boschLength = DEFAULT_DES_WIDTH,
-                 boschLayer = LAYERS.BOSCH):
+                 boschLayer = LayerMapUNO.BOSCH):
     
     c = gf.Component()
     
@@ -412,7 +449,7 @@ def dicing_lanes(lanesX, # x coordinates of vertical dicing (list)
     return c
 
 @gf.cell 
-def dicing_end_ticks(separation, laneWidth = DEFAULT_DICE_WIDTH, layer = LAYERS.LABEL):
+def dicing_end_ticks(separation, laneWidth = DEFAULT_DICE_WIDTH, layer = LayerMapUNO.LABEL):
     c = gf.Component()
     t1 = c << dicing_tick_single(layer = layer).rotate(90)
     t1.dmove(destination = (separation/2, laneWidth/2))
@@ -425,7 +462,7 @@ def dicing_end_ticks(separation, laneWidth = DEFAULT_DICE_WIDTH, layer = LAYERS.
     return c
 
 @gf.cell 
-def dicing_tick_single(w1 = 75e0, w2 = 75e0, bevel = 5e0, layer = LAYERS.LABEL, position = (0,0)):
+def dicing_tick_single(w1 = 75e0, w2 = 75e0, bevel = 5e0, layer = LayerMapUNO.LABEL, position = (0,0)):
     c = gf.Component()
     # this will raise an error unless you force one element to be float with
     # a decimal etc.
@@ -435,7 +472,7 @@ def dicing_tick_single(w1 = 75e0, w2 = 75e0, bevel = 5e0, layer = LAYERS.LABEL, 
     return c
 
 @gf.cell
-def straight_waveguide(dxdy = DEFAULT_DXDY,
+def straight_waveguide(dxdy = Settings.DEFAULT_DXDY,
                        wgWidth = None, 
                        labelIn = None, 
                        labelOut = None,
@@ -448,7 +485,7 @@ def straight_waveguide(dxdy = DEFAULT_DXDY,
                                 tipWidth = tipWidth,
                                 boschWidth = boschWidth)
     route = gf.routing.get_route(ed.ports["o1"], ed.ports["o2"],
-                                   radius=DEFAULT_RADIUS,
+                                   radius=Settings.DEFAULT_RADIUS,
                                    cross_section=crossSection)
     c.add(route.references)
     return c
@@ -458,11 +495,11 @@ def fib_structures(thisWgWidth, thisGap, length = 100e0):
     c = gf.Component()
     # waveguides of various widths for FIB milling + cross section imaging
     (c << gf.components.rectangle(
-        layer = LAYERS.WG, 
+        layer = LayerMapUNO.WG, 
         size = (length,thisWgWidth),
         centered = True))
     (c << gf.components.rectangle(
-        layer = LAYERS.WG, 
+        layer = LayerMapUNO.WG, 
         size = (length,1),
         centered = True)).dmove((0,50e0))
     # also do same geometry as coupling region in ring
@@ -471,7 +508,7 @@ def fib_structures(thisWgWidth, thisGap, length = 100e0):
         length = length,
         cross_section = waveguide_xs(thisWgWidth))).dmove((-length/2,100e0))
     # label
-    # c << gf.components.text('FIB', size = 40, layer = LAYERS.LABEL, position = (225, 25))
+    # c << gf.components.text('FIB', size = 40, layer = LayerMapUNO.LABEL, position = (225, 25))
     return c
 
 # array of edge couplers for fiber arrays
@@ -490,7 +527,7 @@ def edge_coupler_array(couplerComponent = None,
 
 
 @gf.cell
-def edge_coupler_pair(dxdy = DEFAULT_DXDY,
+def edge_coupler_pair(dxdy = Settings.DEFAULT_DXDY,
                       wgWidth = None, 
                       labelIn = None, 
                       labelOut = None, 
@@ -507,12 +544,12 @@ def edge_coupler_pair(dxdy = DEFAULT_DXDY,
     c.add_port("o1", port = e1.ports["o2"], orientation = 0)
     c.add_port("o2", port = e2.ports["o2"], orientation = 90)
     if labelIn is not None:
-        c << gf.components.text(text = labelIn, size = DEFAULT_TEXT_SIZE, 
+        c << gf.components.text(text = labelIn, size = Settings.DEFAULT_TEXT_SIZE, 
                                 position = (boschWidth, dy + 15e0),
-                                layer = LAYERS.LABEL)
+                                layer = LayerMapUNO.LABEL)
     if labelOut is not None:
-        ot = c << gf.components.text(text = labelOut, size = DEFAULT_TEXT_SIZE,
-                                layer = LAYERS.LABEL,
+        ot = c << gf.components.text(text = labelOut, size = Settings.DEFAULT_TEXT_SIZE,
+                                layer = LayerMapUNO.LABEL,
                                 justify = "right")
         ot.rotate(-90)
         ot.dmove(destination = (dx + 15e0, boschWidth))
@@ -520,7 +557,7 @@ def edge_coupler_pair(dxdy = DEFAULT_DXDY,
     return c
 
 @gf.cell
-def edge_coupler_tri(dxdy = DEFAULT_DXDY,
+def edge_coupler_tri(dxdy = Settings.DEFAULT_DXDY,
                       wgWidth = None, 
                      edgeSep = None, 
                      labelIn = None, 
@@ -552,16 +589,16 @@ def edge_coupler_tri(dxdy = DEFAULT_DXDY,
     if labelIn is not None:
         c << gf.components.text(text = labelIn, size = 40e0, 
                                 position = np.array((0,dy)) + textPositionNp,
-                                layer = LAYERS.LABEL)
+                                layer = LayerMapUNO.LABEL)
     if labelOut is not None:
         ot = c << gf.components.text(text = labelOut[0], size = 40e0,
-                                layer = LAYERS.LABEL,
+                                layer = LayerMapUNO.LABEL,
                                 justify = "right")
         ot.rotate(-90)
         ot.dmove(destination = np.array((dx,0)) + np.flip(textPositionNp))
         
         ot = c << gf.components.text(text = labelOut[1], size = 40e0,
-                                layer = LAYERS.LABEL,
+                                layer = LayerMapUNO.LABEL,
                                 justify = "right")
         ot.rotate(-90)
         ot.dmove(destination = np.array((dx + edgeSep,0)) + np.flip(textPositionNp))
@@ -597,7 +634,7 @@ def edge_coupler(tipWidth = None, # tip width
                  straightLength = None):
     # TODO make it easier to globally set edge coupler tip width!
     # straight section at tip width while under dicing blade, then taper
-    wgWidth = DEFAULT_WG_WIDTH if wgWidth is None else wgWidth
+    wgWidth = Settings.DEFAULT_WG_WIDTH if wgWidth is None else wgWidth
     tipWidth = 0.11e0 if tipWidth is None else tipWidth
     taperLength = 50e0 if taperLength is None else taperLength
     straightLength = DEFAULT_BOSCH_WIDTH/2 if straightLength is None else straightLength
@@ -605,8 +642,8 @@ def edge_coupler(tipWidth = None, # tip width
     c = gf.Component()
     straightPath = gf.path.straight(length = straightLength)
     #aperPath = gf.path.straight(length = taperLength)
-    p1 = c << gf.path.extrude(straightPath, layer = LAYERS.WG, width = tipWidth)
-    p2 = c << gf.components.taper(length = taperLength, width1 = tipWidth, width2 = wgWidth, layer= LAYERS.WG)
+    p1 = c << gf.path.extrude(straightPath, layer = LayerMapUNO.WG, width = tipWidth)
+    p2 = c << gf.components.taper(length = taperLength, width1 = tipWidth, width2 = wgWidth, layer= LayerMapUNO.WG)
     p2.connect('o1', p1.ports['o2'])
     c.add_port('o1', port = p1.ports['o1'])
     c.add_port('o2', port = p2.ports['o2'])
@@ -614,8 +651,8 @@ def edge_coupler(tipWidth = None, # tip width
 
 
 @gf.cell
-def y_splitter_adiabatic(w1 = DEFAULT_WG_WIDTH, g1 = 0.15e0, t1 = 0.15e0, 
-                         w2 = DEFAULT_WG_WIDTH, g2 = 0.15e0, t2 = 0.15e0, 
+def y_splitter_adiabatic(w1 = Settings.DEFAULT_WG_WIDTH, g1 = 0.15e0, t1 = 0.15e0, 
+                         w2 = Settings.DEFAULT_WG_WIDTH, g2 = 0.15e0, t2 = 0.15e0, 
                          length = 30e0, escape = 25e0, outSep = 5e0, thisLayer = (1,0)):
     # do taper region with gdsfactory trickery
     # first CrossSection
@@ -664,7 +701,7 @@ def timestamp(position = (0,0),
     timestampTextSize = 50e0
     timeStamp = c << gf.components.version_stamp(labels = [quadrantLabel], 
                                      with_qr_code=False, 
-                                     layer=LAYERS.LABEL, 
+                                     layer=LayerMapUNO.LABEL, 
                                      pixel_size=1, text_size=timestampTextSize)
     timeStamp.dmove((0,0),position)
     if designerLogo is not None:
@@ -686,5 +723,5 @@ def designer_logo(height = 75e0, # height when placed in layout
     for thisPoly in scaledPoly:
         
         thisPoly
-        c.add_polygon(thisPoly, layer = LAYERS.LABEL)
+        c.add_polygon(thisPoly, layer = LayerMapUNO.LABEL)
     return c

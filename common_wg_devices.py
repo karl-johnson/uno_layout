@@ -9,12 +9,10 @@ DEFAULT_RADIUS = Settings.DEFAULT_RADIUS
 DEFAULT_EDGE_SEP = Settings.DEFAULT_EDGE_SEP
 DEFAULT_TEXT_SIZE = Settings.DEFAULT_TEXT_SIZE
 DEFAULT_DXDY = Settings.DEFAULT_DXDY
-DEFAULT_GRATING_DIST = Settings.DEFAULT_GRATING_DIST
-
 
 
 @gf.cell
-def dir_pol_splitter(xsIn, gapIn = 450, lengthIn = 15000, numStages = 3000, 
+def dirPolSplitter(xsIn, gapIn = 450, lengthIn = 15000, numStages = 3000, 
                    coupDy = 4000, coupDx = 10000, stageDx = 70000, stageDy = 15000):
     # polarization splitter made by cascaded dir couplers
     # through is TE, cross is TM, as TM coupling coeff is much higher
@@ -148,8 +146,8 @@ def gen_racetrack(numCouplers, # must be 1 or 2
         c4 = c << half_coupler
         c3.connect('o3', p1.ports['o2'])
         c4.connect('o3', p2.ports['o2'])
-        gf.routing.route_single(c, c3.ports["o1"], c4.ports["o1"],cross_section=waveguide_xs)
-        gf.routing.route_single(c, c3.ports["o0"], c4.ports["o0"],cross_section=waveguide_xs)
+        gf.routing.route_single(c, c3.ports["o1"], c4.ports["o1"],cross_section=crossSection)
+        gf.routing.route_single(c, c3.ports["o0"], c4.ports["o0"],cross_section=crossSection)
         # add those extra ports
         c.add_port('o3', port = c3.ports['o2'])
         c.add_port('o4', port = c4.ports['o2']) 
@@ -203,15 +201,80 @@ def gen_racetrack(numCouplers, # must be 1 or 2
     #                         size = DEFAULT_TEXT_SIZE)
     return c
 
+
 @gf.cell
-def ring_with_grating_couplers(ring: gf.Component | gf.ComponentReference | dict = gen_racetrack(couplerDx=50,numCouplers=2,includeHeater=False),
-                             gratingCoupler: gf.Component | gf.ComponentReference | dict = None, Label = None):
+def gen_coupler_racetrack_2ports(wgWidth = 0.5, ringRadius = 10, 
+                         couplingLength = 10, couplerDx = 30, couplerDy = 10, couplerGap = 0.5, straightLen = 0,
+                         snap_to_size = False, devSize = 100,
+                         crossSection = None, ringLength = None):
+
+    if crossSection == None:
+        crossSection = waveguide_xs(wgWidth)
+    if callable(crossSection):
+        crossSection = crossSection(width=wgWidth)
+    wgWidth = crossSection.width
+    if ringRadius < crossSection.radius:
+        ringRadius = crossSection.radius
+    if(devSize<wgWidth*4+couplerGap*2+ringRadius*2):devSize=wgWidth*2+couplerGap+ringRadius*2
+    if(snap_to_size):
+        couplerDy = (devSize - wgWidth*4+couplerGap*2+ringRadius*2)/2
+    if(straightLen<couplingLength):straightLen=couplingLength
+    c = gf.Component()
+    temp_length = 2 * gf.path.euler(radius=ringRadius, angle=-180, use_eff=True).length()
+    if ringLength is not None:
+        if ringLength < temp_length + straightLen*2:
+            raise Exception("ringLength < euler bends length and couplers length, reduce radius")
+        straightLen = (ringLength - temp_length - straightLen*2)/2
+
+    c1 = c << uno_wg.asymmetric_coupler(wgWidth=wgWidth, couplingLength=couplingLength, couplerDx=couplerDx,
+                                     couplerDy=couplerDy, couplerGap = couplerGap, busLen = straightLen, crossSection=crossSection)
+    c2 = c << uno_wg.asymmetric_coupler(wgWidth=wgWidth, couplingLength=couplingLength, couplerDx=couplerDx,
+                                     couplerDy=couplerDy, couplerGap = couplerGap, busLen = straightLen, crossSection=crossSection)
+    c2.mirror_y()
+    p1 = c << gf.components.bend_euler(radius=ringRadius, angle=-180, cross_section=crossSection)
+    p2 = c << gf.components.bend_euler(radius=ringRadius, angle=-180, cross_section=crossSection)
+    p2.mirror_x()
+    p1.connect("o1", c1.ports["o4"])
+    c2.connect("o4", p1.ports["o2"])
+    p2.connect("o2",c2.ports["o2"])
+    temp_length = 2 * gf.path.euler(radius=ringRadius, angle=-180, use_eff=True).length()
+    temp_length += 2 * straightLen
+    print("This ring 2 port length is " + str(temp_length))
+    
+
+
+    c.add_port(port=c1.ports["o1"],name="o4")
+    c.add_port(port=c1.ports["o3"],name="o3")
+    c.add_port(port=c2.ports["o1"],name="o2")
+    c.add_port(port=c2.ports["o3"],name="o1")
+    c << gf.components.text(text = f"{temp_length:.2f}um", 
+                    layer = LAYERS.ANNOTATION,
+                    position = ((c.ports["o1"].dx+c.ports["o2"].dx)/2, c.ports["o1"].dy - 50),
+                    justify = "center",
+                    size = 25)
+
+
+    c.info["Ring length"] = temp_length
+
+
+    #c.flatten()
+    return c
+
+@gf.cell
+def ringWithGratingCouplers(ring: gf.Component | gf.ComponentReference | dict = None,
+                             gratingCoupler: gf.Component | gf.ComponentReference | dict = uno_wg.apodized_grating_coupler_rectangular(), 
+                             Label = None,crossSection = waveguide_xs):
+
     if type(ring) == dict:
         if "couplerDx" not in ring:
             ring["couplerDx"] = 50
         ring["numCouplers"] = 2
         ring["includeHeater"] = False
-        ring = gen_racetrack(**ring)
+        ring["wgWidth"] = 0.5
+        ring["crossSection"] = crossSection
+        ring = gen_coupler_racetrack_2ports(**ring)
+    if ring is None:
+        ring = gen_coupler_racetrack_2ports(crossSection=crossSection())
     if type(gratingCoupler) == dict:
         gratingCoupler = uno_wg.apodized_grating_coupler_rectangular(gratingCoupler)
     c = gf.Component()
@@ -219,16 +282,16 @@ def ring_with_grating_couplers(ring: gf.Component | gf.ComponentReference | dict
     for i in range(4):
         g.append(c << gratingCoupler)
         g[i].drotate(-90,center="o2")
-        g[i].dmove(gratingCoupler.ports["o2"].dcenter,(i*DEFAULT_GRATING_DIST,0))
+        g[i].dmove(gratingCoupler.ports["o2"].dcenter,(i*Settings.DEFAULT_GRATING_DIST,0))
         c.add_port("o"+str(i+1),g[i].ports["o2"])
     r = c << ring
-    r.dmove(((r.ports["o1"].dx+r.ports["o4"].dx)/2,(r.ports["o1"].dy+r.ports["o4"].dy)/2),(DEFAULT_GRATING_DIST*1.5,200+g[0].ports["o1"].dy))
-    gf.routing.route_bundle(c,[r.ports["o4"],r.ports["o2"],r.ports["o1"],r.ports["o3"]],[x.ports["o1"] for x in g],cross_section = waveguide_xs)
+    r.dmove(((r.ports["o1"].dx+r.ports["o4"].dx)/2,(r.ports["o1"].dy+r.ports["o4"].dy)/2),(Settings.DEFAULT_GRATING_DIST*1.5,200+g[0].ports["o1"].dy))
+    gf.routing.route_bundle(c,[r.ports["o4"],r.ports["o2"],r.ports["o1"],r.ports["o3"]],[x.ports["o1"] for x in g],cross_section = crossSection)
     
     c.info["measurement"] = "ring"
     
     if Label is not None:
-        t = c << gf.components.text(Label,size=20,position=(DEFAULT_GRATING_DIST*1.5,300),justify="center",layer=LAYERS.LABEL)
+        t = c << gf.components.text(Label,size=20,position=(Settings.DEFAULT_GRATING_DIST*1.5,300),justify="center",layer=LAYERS.LABEL)
     return c
 
 @gf.cell
@@ -238,14 +301,14 @@ def two_grating_loopback(gratingCoupler = None, Label = None):
     c1.drotate(-90)
     c2 = c << gratingCoupler
     c2.drotate(-90)
-    c2.dmove(origin=(0,0),destination=(DEFAULT_GRATING_DIST,0))
+    c2.dmove(origin=(0,0),destination=(Settings.DEFAULT_GRATING_DIST,0))
     gf.routing.route_single(c,c1.ports["o1"],c2.ports["o1"],cross_section=waveguide_xs,start_straight_length=50)
     c.add_port(name="o1", port=c1.ports["o2"])
     c.add_port(name="o2", port=c2.ports["o2"])
     c.info["measurement"] = "alignment"
     
     if Label is not None:
-        t = c << gf.components.text(Label,size=20,position=(DEFAULT_GRATING_DIST/2, c1.ports["o1"].dy),justify="center",layer=LAYERS.LABEL)
+        t = c << gf.components.text(Label,size=20,position=(Settings.DEFAULT_GRATING_DIST/2, c1.ports["o1"].dy),justify="center",layer=LAYERS.LABEL)
     return c
 
 # routes electrical and optical made by gen_racetrack

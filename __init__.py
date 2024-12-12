@@ -17,7 +17,7 @@ class Settings:
     # recommended way to reference layers: from uno_layout import LAYERS
     # then you can simply do LAYERS.WG etc everywhere
     DEFAULT_WG_WIDTH = 0.5
-    DEFAULT_RADIUS = 25
+    DEFAULT_RADIUS = 5
     DEFAULT_EDGE_SEP = 100
     DEFAULT_ROUTE_WIDTH = 25
     DEFAULT_TEXT_SIZE = 50
@@ -56,7 +56,7 @@ def waveguide_xs(width=None, layer=None, radius=None):
     #wgWidth = DEFAULT_WG_WIDTH if wgWidth is None else wgWidth
     s0 = gf.Section(
         width=width,
-        layer= LayerMapUNO.WG,
+        layer= layer,
         port_names=("o1", "o2"),
         name = "Wvg")
     return gf.CrossSection(sections = [s0], radius = radius)
