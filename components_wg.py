@@ -14,6 +14,14 @@ DEFAULT_BOSCH_WIDTH = 300e0
 DEFAULT_DES_WIDTH = 8000e0
 DEFAULT_DICE_WIDTH = 93e0
 
+DEFAULT_ASYM_COUPLER_HALF_STRAIGHT_LENGTH = 10
+
+
+    
+    
+    
+    
+
 # this is a copy of gdsfactory's coupler_asymmetric but uses 4 ports instead of 3
 @gf.cell
 def coupler_asymmetric(
@@ -44,7 +52,7 @@ def coupler_asymmetric(
     x = gf.get_cross_section(cross_section)
     width = x.width
     bend = gf.components.bend_s(size=(dx, dy - gap - width), cross_section=cross_section)
-    wg = gf.components.straight(cross_section=cross_section)
+    wg = gf.components.straight(cross_section=cross_section, length = DEFAULT_ASYM_COUPLER_HALF_STRAIGHT_LENGTH)
 
     w = bend.ports[0].dwidth
     y = (w + gap) / 2
@@ -108,6 +116,47 @@ def asymmetric_coupler(wgWidth = 0.5, couplingLength = 10.0,
     c.flatten(False)
     return c
 
+
+def coupler_asymmetric_full(
+    gap: float = 0.25,
+    dy: float = 2.5,
+    dx: float = 10.0,
+    coupling_length: float = 5,
+    cross_section = waveguide_xs(Settings.DEFAULT_WG_WIDTH),
+) -> gf.Component:
+    c = gf.Component()
+    """
+    Same as coupler_asymmetric but does both sides:
+                              dx
+                           |------|
+             o0 ____         _____ o2
+                    \       /         |
+                     \_____/          |
+         gap o1 __________________ o3 |  dy
+                            
+    """
+    # place half ring couplers
+    half_coupler = coupler_asymmetric(gap, dy, dx, cross_section)
+    c1 = c << half_coupler
+    c2 = c << half_coupler
+    c2.dmirror_x()
+    # # add coupling length
+    c2.dmove(c2.ports['o1'].dcenter, c1.ports['o1'].dcenter)
+    c1.dmove((coupling_length, 0))
+
+    # coupling region straight wgs
+    s1 = c << gf.components.straight(length = coupling_length, cross_section = cross_section)
+    s1.connect('o1', c1.ports['o1'])
+    s2 = c << gf.components.straight(length = coupling_length, cross_section = cross_section)
+    s2.connect('o1', c1.ports['o0'])
+    
+    # promote ports
+    c.add_port(name = 'o0', port = c1.ports['o2'])
+    c.add_port(name = 'o1', port = c1.ports['o3'])
+    c.add_port(name = 'o2', port = c2.ports['o2'])
+    c.add_port(name = 'o3', port = c2.ports['o3'])
+    
+    return c
 
 @gf.cell 
 def apodized_grating_coupler_rectangular(

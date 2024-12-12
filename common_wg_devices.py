@@ -203,7 +203,7 @@ def gen_racetrack(numCouplers, # must be 1 or 2
 
 
 @gf.cell
-def gen_coupler_racetrack_2ports(wgWidth = 0.5, ringRadius = 10, 
+def gen_coupler_racetrack_2ports(wgWidth = 0.5, eulerRadius = 10, 
                          couplingLength = 10, couplerDx = 30, couplerDy = 10, couplerGap = 0.5, straightLen = 0,
                          snap_to_size = False, devSize = 100,
                          crossSection = None, ringLength = None):
@@ -213,14 +213,14 @@ def gen_coupler_racetrack_2ports(wgWidth = 0.5, ringRadius = 10,
     if callable(crossSection):
         crossSection = crossSection(width=wgWidth)
     wgWidth = crossSection.width
-    if ringRadius < crossSection.radius:
-        ringRadius = crossSection.radius
-    if(devSize<wgWidth*4+couplerGap*2+ringRadius*2):devSize=wgWidth*2+couplerGap+ringRadius*2
+    if eulerRadius < crossSection.radius:
+        eulerRadius = crossSection.radius
+    if(devSize<wgWidth*4+couplerGap*2+eulerRadius*2):devSize=wgWidth*2+couplerGap+eulerRadius*2
     if(snap_to_size):
-        couplerDy = (devSize - wgWidth*4+couplerGap*2+ringRadius*2)/2
+        couplerDy = (devSize - wgWidth*4+couplerGap*2+eulerRadius*2)/2
     if(straightLen<couplingLength):straightLen=couplingLength
     c = gf.Component()
-    temp_length = 2 * gf.path.euler(radius=ringRadius, angle=-180, use_eff=True).length()
+    temp_length = 2 * gf.path.euler(radius=eulerRadius, angle=-180, use_eff=True).length()
     if ringLength is not None:
         if ringLength < temp_length + straightLen*2:
             raise Exception("ringLength < euler bends length and couplers length, reduce radius")
@@ -231,13 +231,13 @@ def gen_coupler_racetrack_2ports(wgWidth = 0.5, ringRadius = 10,
     c2 = c << uno_wg.asymmetric_coupler(wgWidth=wgWidth, couplingLength=couplingLength, couplerDx=couplerDx,
                                      couplerDy=couplerDy, couplerGap = couplerGap, busLen = straightLen, crossSection=crossSection)
     c2.mirror_y()
-    p1 = c << gf.components.bend_euler(radius=ringRadius, angle=-180, cross_section=crossSection)
-    p2 = c << gf.components.bend_euler(radius=ringRadius, angle=-180, cross_section=crossSection)
+    p1 = c << gf.components.bend_euler(radius=eulerRadius, angle=-180, cross_section=crossSection)
+    p2 = c << gf.components.bend_euler(radius=eulerRadius, angle=-180, cross_section=crossSection)
     p2.mirror_x()
     p1.connect("o1", c1.ports["o4"])
     c2.connect("o4", p1.ports["o2"])
     p2.connect("o2",c2.ports["o2"])
-    temp_length = 2 * gf.path.euler(radius=ringRadius, angle=-180, use_eff=True).length()
+    temp_length = 2 * gf.path.euler(radius=eulerRadius, angle=-180, use_eff=True).length()
     temp_length += 2 * straightLen
     print("This ring 2 port length is " + str(temp_length))
     
@@ -260,29 +260,33 @@ def gen_coupler_racetrack_2ports(wgWidth = 0.5, ringRadius = 10,
     #c.flatten()
     return c
 
-@gf.cell
-def ringWithGratingCouplers(ring: gf.Component | gf.ComponentReference | dict = None,
-                             gratingCoupler: gf.Component | gf.ComponentReference | dict = uno_wg.apodized_grating_coupler_rectangular(), 
-                             Label = None,crossSection = waveguide_xs):
+# @gf.cell
+# def ringWithGratingCouplers(ring: gf.Component | gf.ComponentReference | dict = None,
+#                              gratingCoupler: gf.Component | gf.ComponentReference | dict = uno_wg.apodized_grating_coupler_rectangular(), 
+#                              Label = None,crossSection = waveguide_xs):
 
+def ring_with_grating_couplers(ring: gf.Component | gf.ComponentReference | dict = gen_racetrack(couplerDx=50,numCouplers=2,includeHeater=False),
+                             grating_coupler: gf.Component | gf.ComponentReference | dict = None, Label = None, crossSection = waveguide_xs):
     if type(ring) == dict:
         if "couplerDx" not in ring:
             ring["couplerDx"] = 50
         ring["numCouplers"] = 2
         ring["includeHeater"] = False
         ring["wgWidth"] = 0.5
-        ring["crossSection"] = crossSection
-        ring = gen_coupler_racetrack_2ports(**ring)
+        #ring["crossSection"] = crossSection
+        ring = gen_racetrack(**ring)
+        #ring = gen_coupler_racetrack_2ports(**ring)
     if ring is None:
-        ring = gen_coupler_racetrack_2ports(crossSection=crossSection())
-    if type(gratingCoupler) == dict:
-        gratingCoupler = uno_wg.apodized_grating_coupler_rectangular(gratingCoupler)
+        ring = gen_racetrack()
+        #ring = gen_coupler_racetrack_2ports(crossSection=crossSection())
+    if type(grating_coupler) == dict:
+        grating_coupler = uno_wg.apodized_grating_coupler_rectangular(grating_coupler)
     c = gf.Component()
     g = list[gf.ComponentReference]()
     for i in range(4):
-        g.append(c << gratingCoupler)
+        g.append(c << grating_coupler)
         g[i].drotate(-90,center="o2")
-        g[i].dmove(gratingCoupler.ports["o2"].dcenter,(i*Settings.DEFAULT_GRATING_DIST,0))
+        g[i].dmove(grating_coupler.ports["o2"].dcenter,(i*Settings.DEFAULT_GRATING_DIST,0))
         c.add_port("o"+str(i+1),g[i].ports["o2"])
     r = c << ring
     r.dmove(((r.ports["o1"].dx+r.ports["o4"].dx)/2,(r.ports["o1"].dy+r.ports["o4"].dy)/2),(Settings.DEFAULT_GRATING_DIST*1.5,200+g[0].ports["o1"].dy))
