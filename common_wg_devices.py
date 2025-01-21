@@ -225,7 +225,7 @@ def gen_coupler_racetrack_2ports(wgWidth = 0.5, eulerRadius = 10,
     if crossSection == None:
         crossSection = waveguide_xs(wgWidth)
     if callable(crossSection):
-        crossSection = crossSection(width=wgWidth)
+        crossSection = crossSection()
     wgWidth = crossSection.width
     if eulerRadius < crossSection.radius:
         eulerRadius = crossSection.radius
