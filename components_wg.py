@@ -208,7 +208,7 @@ def apodized_grating_coupler_focused(
         length_taper = 50e0,
         crossSection = None,
         polarization = 'te',
-        name = ""):
+        layer_grating = None):
     if crossSection is None:
         crossSection = waveguide_xs
     curr_pos = 0
@@ -227,10 +227,12 @@ def apodized_grating_coupler_focused(
         gaps = gaps, 
         widths = widths,
         taper_length = length_taper,
-        layer_grating = LayerMapUNO.WG,
+        layer_grating = layer_grating,
         cross_section=crossSection,
         layer_slab = False,
         polarization = polarization)
+
+
 
 @gf.cell
 def mode_filter(wgWidth = Settings.DEFAULT_WG_WIDTH,
