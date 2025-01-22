@@ -290,7 +290,7 @@ def ring_with_grating_couplers(ring: gf.Component | gf.ComponentReference | dict
             ring["couplerDx"] = 50
         ring["numCouplers"] = 2
         ring["includeHeater"] = False
-        ring["wgWidth"] = 0.5
+        ring["wgWidth"] = 1.4
         #ring["crossSection"] = crossSection
         #ring = gen_racetrack(**ring)
         ring = gen_racetrack(**ring)
