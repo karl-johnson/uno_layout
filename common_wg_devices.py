@@ -290,7 +290,7 @@ def ring_with_grating_couplers(ring: gf.Component | gf.ComponentReference | dict
             ring["couplerDx"] = 50
         ring["numCouplers"] = 2
         ring["includeHeater"] = False
-        ring["wgWidth"] = 1.4
+        ring["wgWidth"] = 0.5
         #ring["crossSection"] = crossSection
         #ring = gen_racetrack(**ring)
         ring = gen_racetrack(**ring)
@@ -338,11 +338,11 @@ def two_grating_loopback(gratingCoupler = None, Label = None):
 # routes electrical and optical made by gen_racetrack
 @gf.cell
 def gen_routed_racetrack(ringComponent = None,
-                         wgWidth = 0.5e0,
+                         wgWidth = DEFAULT_WG_WIDTH,
                          offsetX = 500e0,
                          dxdy = (1000e0,1000e0),
-                         inLabel = "Ri",
-                         outLabel = "Ro",
+                         inLabel = None,
+                         outLabel = None,
                          routingRad = DEFAULT_RADIUS,
                          inputSep = 200e0,
                          outputSep = 200e0,
@@ -355,30 +355,37 @@ def gen_routed_racetrack(ringComponent = None,
     # detect whether ringComponent has 1 or 2 couplers, hacky method for now
     numPorts = uno_tools.count_optical_ports(ringComponent)
     
-    
-    
-    e1 = c << uno_wg.edge_coupler_pair(dxdy, wgWidth, 
-                                       inLabel+'-0', outLabel+'-0', tipWidth=edgeCouplerTip)
-    c.add(gf.routing.get_route(e1.ports["o1"], 
-                                      r.ports[portOrder[0]],
-                                      radius=routingRad,
-                                      cross_section=crossSection).references)
-    c.add(gf.routing.get_route(e1.ports["o2"], 
-                                      r.ports[portOrder[1]],
-                                      radius=routingRad,
-                                      cross_section=crossSection).references)
-    if(numPorts == 4):
-        e2 = c << uno_wg.edge_coupler_pair(np.array(dxdy) + np.array((outputSep, inputSep)), wgWidth,
-                                    inLabel+'-1', outLabel+'-1', tipWidth=edgeCouplerTip)
-        c.add(gf.routing.get_route(e2.ports["o1"], 
-                                          r.ports[portOrder[2]],
-                                          radius=routingRad,
-                                          cross_section=crossSection).references)
+    # TODO handle None labels better
+    if inLabel is not None:
+        inLabel0 =  inLabel+'-0'
+        outLabel0 = outLabel+'-0'
+        inLabel0 =  inLabel+'-1'
+        outLabel0 = outLabel+'-1'
+    else:
+        inLabel0 = None
+        outLabel0 = None
+        inLabel1 = None
+        outLabel1 = None
         
-        c.add(gf.routing.get_route(e2.ports["o2"], 
+    e1 = c << uno_wg.edge_coupler_pair(dxdy, wgWidth, 
+                                       inLabel0, outLabel0, tipWidth=edgeCouplerTip)
+    gf.routing.route_single_sbend(c,e1.ports["o1"], 
+                                      r.ports[portOrder[0]],
+                                      cross_section=crossSection)
+    gf.routing.route_single(c,e1.ports["o2"], 
+                                      r.ports[portOrder[1]],
+                                      cross_section=crossSection)
+
+    if(numPorts == 4):
+        e2 = c << uno_wg.edge_coupler_pair((dxdy[0] + outputSep, dxdy[1] + inputSep), wgWidth,
+                                    inLabel1, outLabel1, tipWidth=edgeCouplerTip)
+        gf.routing.route_single_sbend(c,e2.ports["o1"], 
+                                          r.ports[portOrder[2]],
+                                          cross_section=crossSection)
+        
+        gf.routing.route_single(c,e2.ports["o2"], 
                                           r.ports[portOrder[3]],
-                                          radius=routingRad,
-                                          cross_section=crossSection).references)
+                                          cross_section=crossSection)
     return c
 
 @gf.cell 

@@ -23,7 +23,7 @@ def count_optical_ports(componentIn):
     # TODO fix with electrical/optical type
     count = 0
     for thisPort in componentIn.ports:
-        if(thisPort[0] == 'o'):
+        if(thisPort.port_type == 'optical'):
             count += 1
     return count
 

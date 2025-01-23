@@ -384,7 +384,7 @@ def ant_trench_perimeter():
     for angle in [0, 90, 180, 270]:
         (c << gf.components.bbox(
             left = -outerWidth/2, bottom = innerWidth/2, top = outerWidth/2, right = outerWidth/2,
-            layer = LayerMapUNO.ANT_EDGE_TRENCH)).rotate(angle)
+            layer = LayerMapUNO.ANT_EDGE_TRENCH)).drotate(angle)
     return c
 
 @gf.cell
@@ -414,7 +414,7 @@ def mla_crosses(dx = 4000e0,
     cross = mla_cross(layer = thisLayer)
     for cIdx in range(4):
         thisC = c << cross
-        thisC.dmove(destination=(dx,dy))
+        thisC.dmove((dx,dy))
         if(cIdx == 1 or cIdx == 3):
             thisC.mirror((0,1))
         if(cIdx == 2 or cIdx == 3):
@@ -502,14 +502,14 @@ def dicing_lanes(lanesX, # x coordinates of vertical dicing (list)
 @gf.cell 
 def dicing_end_ticks(separation, laneWidth = DEFAULT_DICE_WIDTH, layer = LayerMapUNO.LABEL):
     c = gf.Component()
-    t1 = c << dicing_tick_single(layer = layer).rotate(90)
-    t1.dmove(destination = (separation/2, laneWidth/2))
-    t2 = c << dicing_tick_single(layer = layer).rotate(180)
-    t2.dmove(destination = (separation/2, -laneWidth/2))
-    t1 = c << dicing_tick_single(layer = layer).rotate(0)
-    t1.dmove(destination = (-separation/2, laneWidth/2))
-    t2 = c << dicing_tick_single(layer = layer).rotate(270)
-    t2.dmove(destination = (-separation/2, -laneWidth/2))
+    t1 = c << dicing_tick_single(layer = layer).drotate(90)
+    t1.dmove((separation/2, laneWidth/2))
+    t2 = c << dicing_tick_single(layer = layer).drotate(180)
+    t2.dmove((separation/2, -laneWidth/2))
+    t1 = c << dicing_tick_single(layer = layer).drotate(0)
+    t1.dmove((-separation/2, laneWidth/2))
+    t2 = c << dicing_tick_single(layer = layer).drotate(270)
+    t2.dmove((-separation/2, -laneWidth/2))
     return c
 
 @gf.cell 
@@ -535,10 +535,8 @@ def straight_waveguide(dxdy = Settings.DEFAULT_DXDY,
     ed = c << edge_coupler_pair(dxdy, wgWidth, labelIn, labelOut,
                                 tipWidth = tipWidth,
                                 boschWidth = boschWidth)
-    route = gf.routing.get_route(ed.ports["o1"], ed.ports["o2"],
-                                   radius=Settings.DEFAULT_RADIUS,
-                                   cross_section=crossSection)
-    c.add(route.references)
+    
+    gf.routing.route_single(c, ed.ports["o1"], ed.ports["o2"],cross_section=crossSection)
     return c
 
 @gf.cell
@@ -571,7 +569,7 @@ def edge_coupler_array(couplerComponent = None,
     c = gf.Component()
     couplerComponent = edge_coupler() if couplerComponent is None else couplerComponent
     for i in range(n):
-        thisC = (c << couplerComponent).rotate(couplerRotation)
+        thisC = (c << couplerComponent).drotate(couplerRotation)
         thisC.dmovex(dx*i)
         c.add_port(f"o{i}", port = thisC.ports['o2'])
     return c
@@ -590,7 +588,7 @@ def edge_coupler_pair(dxdy = Settings.DEFAULT_DXDY,
     e1 = c << edge_coupler(tipWidth, wgWidth, straightLength = boschWidth/2)
     e1.dmove(e1.ports["o1"].dcenter, (0, dy))
     e2 = c << edge_coupler(tipWidth, wgWidth, straightLength = boschWidth/2)
-    e2.rotate(90)
+    e2.drotate(90)
     e2.dmove(e2.ports["o1"].dcenter, (dx, 0))
     c.add_port("o1", port = e1.ports["o2"], orientation = 0)
     c.add_port("o2", port = e2.ports["o2"], orientation = 90)
@@ -602,8 +600,8 @@ def edge_coupler_pair(dxdy = Settings.DEFAULT_DXDY,
         ot = c << gf.components.text(text = labelOut, size = Settings.DEFAULT_TEXT_SIZE,
                                 layer = LayerMapUNO.LABEL,
                                 justify = "right")
-        ot.rotate(-90)
-        ot.dmove(destination = (dx + 15e0, boschWidth))
+        ot.drotate(-90)
+        ot.dmove((dx + 15e0, boschWidth))
 
     return c
 
@@ -624,9 +622,9 @@ def edge_coupler_tri(dxdy = Settings.DEFAULT_DXDY,
     e1 = c << thisEdgeCoupler
     e1.dmove(e1.ports["o1"].dcenter, (0, dy))
     e2 = c << thisEdgeCoupler
-    e2.rotate(90)
+    e2.drotate(90)
     e0 = c << thisEdgeCoupler
-    e0.rotate(90)
+    e0.drotate(90)
     
     e2.dmove(e2.ports["o1"].dcenter, (dx, 0))
     e0.dmove(e0.ports["o1"].dcenter, (dx + edgeSep, 0))
@@ -645,14 +643,14 @@ def edge_coupler_tri(dxdy = Settings.DEFAULT_DXDY,
         ot = c << gf.components.text(text = labelOut[0], size = 40e0,
                                 layer = LayerMapUNO.LABEL,
                                 justify = "right")
-        ot.rotate(-90)
-        ot.dmove(destination = np.array((dx,0)) + np.flip(textPositionNp))
+        ot.drotate(-90)
+        ot.dmove(np.array((dx,0)) + np.flip(textPositionNp))
         
         ot = c << gf.components.text(text = labelOut[1], size = 40e0,
                                 layer = LayerMapUNO.LABEL,
                                 justify = "right")
-        ot.rotate(-90)
-        ot.dmove(destination = np.array((dx + edgeSep,0)) + np.flip(textPositionNp))
+        ot.drotate(-90)
+        ot.dmove(np.array((dx + edgeSep,0)) + np.flip(textPositionNp))
     return c
 
 @gf.cell
