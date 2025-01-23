@@ -15,7 +15,7 @@ DEFAULT_TEXT_SIZE = Settings.DEFAULT_TEXT_SIZE
 DEFAULT_DXDY = Settings.DEFAULT_DXDY
 
 
-@gf.cell(check_instances=False)
+@gf.cell()
 def rowland_fsp(r_a:float = 50, y_span:float = 25, 
                 n_io = 1, d_io = 2, # 'r' subscripts in paper
                 n_array = 9, d_array = 2, # 'a' subscripts in paper
@@ -90,7 +90,8 @@ def rowland_fsp(r_a:float = 50, y_span:float = 25,
             this_bend = c << gf.components.bend_circular(radius = this_radius, angle = -math.degrees(output_angle[1]), cross_section = xs)
         this_bend.connect('o1', this_wg.ports['o2'])
         c.add_port(f'o{output_angle[0]}', port = this_bend.ports['o2'])
-
+        
+    c.flatten()
     return c    
 
 @gf.cell(check_instances=False)
@@ -99,20 +100,42 @@ def awg(fsp, # this must be callable, for now all parameters identical for 1st a
         n_a = 8, # num array waveguides
         n_o = 8, # num outputs
         delta_L = 10, # length difference between arms
-        fsp_spacing = 100,
+        fsp_spacing = 200,
         min_waveguide_spacing = 5,
         xs = waveguide_xs()):
     c = gf.Component()
     
     f1 = c << fsp(n_io = n_i, n_array = n_a)
     f2 = c << fsp(n_io = n_o, n_array = n_a)
-    f2.dmovey(-fsp_spacing)
+    f2.dmirror_y().dmovey(-fsp_spacing)
     
     # get path length difference using combination of port-to-port spacing and extension of loops
-    # need to performa a check that the desired delta_L can actually be achieved
     
-    
-    gf.route.route_single()
+    # last_y_spacing = 0
+    # last_x_offset = xs.radius
+    # for wg_idx in range(n_a):
+    #     this_port_1 = f1.ports[f'o{wg_idx}']
+    #     this_port_2 = f2.ports[f'o{wg_idx}']
+        
+    #     if(wg_idx == 0):
+    #         this_x_offset = last_x_offset
+    #     else:
+    #         this_y_spacing = abs(this_port_1.dcenter[1] - this_port_2.dcenter[1])
+    #         # delta length between arms is
+    #         # delta_L = (this_y_spacing - last_y_spacing) + 2*this_x_offset
+    #         # therefore:
+    #         this_x_delta = 0.5*(delta_L - (this_y_spacing - last_y_spacing))
+    #         if(this_x_delta < min_waveguide_spacing):
+    #             raise Exception("AWG delta_L (f{delta_L}) incompatible with fsp region waveguide spacing and min_waveguide_spacing")
+    #         this_x_offset = last_x_offset + this_x_delta
+        
+        # ROUTE SINGLE
+        #gf.routing.route_single_from_steps(c, this_port_1, this_port_2, steps = [{'dx': this_x_offset}])
+        
+        # last_x_offset = this_x_offset
+        # last_y_spacing = this_y_spacing
+        
+        #gf.routing.route_single(c, , , cross_section = xs)
     
     # if fsp_out is None:
     #     if fsp_in is None:
@@ -133,3 +156,33 @@ def awg(fsp, # this must be callable, for now all parameters identical for 1st a
     
     return c
 
+@gf.cell
+def fancy_awg_route(d, phi_deg, L_desired, xs = waveguide_xs()):
+    # figure out routing between angled ports of two AWG couplers using just one arc and two straight lines
+    # the waveguide direction of both couplers must form an angle of phi with
+    #   respect to the line connecting the two ports, which has length d
+    
+    # TODO optimize using euler bends
+    
+    
+    phi = math.radians(phi_deg)
+    # the math here is quite a fun geometry problem!!!
+    # compute straight length
+    s = 0.5* (phi*d/math.sin(phi) - L_desired) / (phi/math.tan(phi) - 1)
+    if s < 0:
+        raise Exception("AWG routing requires straight length < 0, try a different configuration")
+    radius = (d - 2*s*math.cos(phi))/(2*math.sin(phi))
+    if radius < xs.radius:
+        raise Exception("AWG routing requires bend radius < min bend radius, try a different configuration")
+        
+    # generate path all at once and avoid non-manhattan connection nightmare
+    p = (gf.path.straight(s) 
+        + gf.path.arc(radius = radius, angle = 2*phi_deg)
+        + gf.path.straight(s))
+    
+    c = gf.path.extrude(p, xs)
+    
+    return c
+    
+    
+    
