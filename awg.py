@@ -110,7 +110,8 @@ def awg(fsp, # this must be callable, for now all parameters identical for 1st a
         fsp_angle = -10, # 0 means parallel, <0 means facing each other
         start_length = 200,
         min_waveguide_spacing = 5,
-        xs = waveguide_xs()):
+        xs = waveguide_xs(),
+        debug_print = True):
     c = gf.Component()
     
     f1 = c << fsp(n_io = n_i, n_array = n_a)
@@ -123,10 +124,15 @@ def awg(fsp, # this must be callable, for now all parameters identical for 1st a
         this_port_1 = f1.ports[f'o{wg_idx}']
         this_port_2 = f2.ports[f'o{wg_idx}']
         d = np.linalg.norm(np.array(this_port_1.dcenter)-np.array(this_port_2.dcenter))
-        phi_deg = abs(90 - 0.5*abs(this_port_1.orientation - this_port_2.orientation))
+        # assumes symmetry!!!
+        if(this_port_1.orientation < 180):
+            phi_deg = 90 + this_port_1.orientation
+        else:
+            phi_deg = this_port_1.orientation - 270
+        #if phi_deg < +180: phi_deg -= 180 #  TODO probably more edge cases here...
         
-        
-        this_wg = c << fancy_awg_bend(d, phi_deg, L_desired, xs = waveguide_xs())
+
+        this_wg = c << fancy_awg_bend(d, phi_deg, L_desired, xs = waveguide_xs(), wg_idx = wg_idx)
         this_wg.connect('o1', this_port_1)
         
         L_desired += delta_L
@@ -180,7 +186,7 @@ def awg(fsp, # this must be callable, for now all parameters identical for 1st a
     return c
 
 @gf.cell
-def fancy_awg_bend(d, phi_deg, L_desired, xs = waveguide_xs()):
+def fancy_awg_bend(d, phi_deg, L_desired, xs = waveguide_xs(), wg_idx = None):
     # figure out routing between angled ports of two AWG couplers using just one arc and two straight lines
     # the waveguide direction of both couplers must form an angle of phi with
     #   respect to the line connecting the two ports, which has length d
@@ -191,10 +197,10 @@ def fancy_awg_bend(d, phi_deg, L_desired, xs = waveguide_xs()):
     # compute straight length
     s = 0.5* (phi*d/math.sin(phi) - L_desired) / (phi/math.tan(phi) - 1)
     if s < 0:
-        raise Exception("AWG routing requires straight length < 0, try a different configuration")
+        raise Exception(f"AWG waveguide {wg_idx}: AWG routing requires straight length < 0, meaning the required length is too short for the distance needing to be routed. Try a configuration that increases the desired length (starting length ^) or reduces the required distance to be routed.")
     radius = (d - 2*s*math.cos(phi))/(2*math.sin(phi))
     if radius < xs.radius:
-        raise Exception("AWG routing requires bend radius < min bend radius, try a different configuration")
+        print(f"Warning! AWG waveguide {wg_idx}: AWG routing requires bend radius ({radius}) < min bend radius ({xs.radius}), meaning the desired length is too long. Try a configuration that decreases the desired length.")
         
     # generate path all at once and avoid non-manhattan connection nightmare
     p = (gf.path.straight(s) 
