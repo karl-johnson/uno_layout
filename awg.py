@@ -65,31 +65,37 @@ def rowland_fsp(r_a:float = 50, y_span:float = 25,
     input_bend_length = max(input_port_angles)*xs.radius
     for input_angle in enumerate(input_port_angles):
         # first, insert straight waveguide
-        this_wg = c << gf.components.straight(length = input_wg_length + ports_inside_arc, cross_section=xs)
-        this_wg.drotate(-math.degrees(input_angle[1])+180).dmove(io_curve(input_angle[1], -ports_inside_arc))
-        # now add a lil bend to make it straight, all bends are same length
-        if(input_angle[1] == 0):
-            this_bend = c << gf.components.straight(length = input_bend_length, cross_section=xs)
-        else:
-            this_radius = abs(input_bend_length/input_angle[1])
-            this_bend = c << gf.components.bend_circular(radius = this_radius, angle = math.degrees(input_angle[1]), cross_section = xs)
-        this_bend.connect('o1', this_wg.ports['o2'])
-        c.add_port(f'i{input_angle[0]}', port = this_bend.ports['o2'])
+        # this_wg = c << gf.components.straight(length = input_wg_length + ports_inside_arc, cross_section=xs)
+        # this_wg.drotate(-math.degrees(input_angle[1])+180).dmove(io_curve(input_angle[1], -ports_inside_arc))
+        # # now add a lil bend to make it straight, all bends are same length
+        # if(input_angle[1] == 0):
+        #     this_bend = c << gf.components.straight(length = input_bend_length, cross_section=xs)
+        # else:
+        #     this_radius = abs(input_bend_length/input_angle[1])
+        #     this_bend = c << gf.components.bend_circular(radius = this_radius, angle = math.degrees(input_angle[1]), cross_section = xs)
+        # this_bend.connect('o1', this_wg.ports['o2'])
+        c.add_port(f'i{input_angle[0]}', 
+                   center = io_curve(input_angle[1], -ports_inside_arc),
+                   orientation = -math.degrees(input_angle[1])+180,
+                   cross_section=xs)
         
     output_port_angles = [d_array/r_a * (i - 0.5*(n_array-1)) for i in range(n_array)]
     output_bend_length = max(output_port_angles)*xs.radius
     for output_angle in enumerate(output_port_angles):
         # first, insert straight waveguide
-        this_wg = c << gf.components.straight(length = output_wg_length + ports_inside_arc, cross_section=xs)
-        this_wg.drotate(math.degrees(output_angle[1])).dmove(array_curve(output_angle[1], -ports_inside_arc))
-        # now add a lil bend to make it straight, all bends are same length
-        if(output_angle[1] == 0):
-            this_bend = c << gf.components.straight(length = output_bend_length, cross_section=xs)
-        else:
-            this_radius = abs(output_bend_length/output_angle[1])
-            this_bend = c << gf.components.bend_circular(radius = this_radius, angle = -math.degrees(output_angle[1]), cross_section = xs)
-        this_bend.connect('o1', this_wg.ports['o2'])
-        c.add_port(f'o{output_angle[0]}', port = this_bend.ports['o2'])
+        # this_wg = c << gf.components.straight(length = output_wg_length + ports_inside_arc, cross_section=xs)
+        # this_wg.drotate(math.degrees(output_angle[1])).dmove(array_curve(output_angle[1], -ports_inside_arc))
+        # # now add a lil bend to make it straight, all bends are same length
+        # if(output_angle[1] == 0):
+        #     this_bend = c << gf.components.straight(length = output_bend_length, cross_section=xs)
+        # else:
+        #     this_radius = abs(output_bend_length/output_angle[1])
+        #     this_bend = c << gf.components.bend_circular(radius = this_radius, angle = -math.degrees(output_angle[1]), cross_section = xs)
+        # this_bend.connect('o1', this_wg.ports['o2'])
+        c.add_port(f'o{output_angle[0]}',
+                   center = array_curve(output_angle[1], -ports_inside_arc),
+                   orientation = math.degrees(output_angle[1]),
+                   cross_section=xs)
         
     c.flatten()
     return c    
@@ -100,14 +106,31 @@ def awg(fsp, # this must be callable, for now all parameters identical for 1st a
         n_a = 8, # num array waveguides
         n_o = 8, # num outputs
         delta_L = 10, # length difference between arms
-        fsp_spacing = 200,
+        fsp_spacing = 100, 
+        fsp_angle = -10, # 0 means parallel, <0 means facing each other
+        start_length = 200,
         min_waveguide_spacing = 5,
         xs = waveguide_xs()):
     c = gf.Component()
     
     f1 = c << fsp(n_io = n_i, n_array = n_a)
+    f1.drotate(fsp_angle)
     f2 = c << fsp(n_io = n_o, n_array = n_a)
-    f2.dmirror_y().dmovey(-fsp_spacing)
+    f2.drotate(fsp_angle).dmirror_y().dmovey(-fsp_spacing)
+    
+    L_desired = start_length
+    for wg_idx in range(n_a):
+        this_port_1 = f1.ports[f'o{wg_idx}']
+        this_port_2 = f2.ports[f'o{wg_idx}']
+        d = np.linalg.norm(np.array(this_port_1.dcenter)-np.array(this_port_2.dcenter))
+        phi_deg = abs(90 - 0.5*abs(this_port_1.orientation - this_port_2.orientation))
+        
+        
+        this_wg = c << fancy_awg_bend(d, phi_deg, L_desired, xs = waveguide_xs())
+        this_wg.connect('o1', this_port_1)
+        
+        L_desired += delta_L
+        
     
     # get path length difference using combination of port-to-port spacing and extension of loops
     
@@ -157,14 +180,12 @@ def awg(fsp, # this must be callable, for now all parameters identical for 1st a
     return c
 
 @gf.cell
-def fancy_awg_route(d, phi_deg, L_desired, xs = waveguide_xs()):
+def fancy_awg_bend(d, phi_deg, L_desired, xs = waveguide_xs()):
     # figure out routing between angled ports of two AWG couplers using just one arc and two straight lines
     # the waveguide direction of both couplers must form an angle of phi with
     #   respect to the line connecting the two ports, which has length d
     
     # TODO optimize using euler bends
-    
-    
     phi = math.radians(phi_deg)
     # the math here is quite a fun geometry problem!!!
     # compute straight length
@@ -177,12 +198,10 @@ def fancy_awg_route(d, phi_deg, L_desired, xs = waveguide_xs()):
         
     # generate path all at once and avoid non-manhattan connection nightmare
     p = (gf.path.straight(s) 
-        + gf.path.arc(radius = radius, angle = 2*phi_deg)
+        + gf.path.arc(radius = radius, angle = -2*phi_deg)
         + gf.path.straight(s))
-    
-    c = gf.path.extrude(p, xs)
-    
-    return c
+    print(p.length())
+    return gf.path.extrude(p, xs)
     
     
     
