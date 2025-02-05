@@ -17,11 +17,6 @@ DEFAULT_DICE_WIDTH = 93e0
 DEFAULT_ASYM_COUPLER_HALF_STRAIGHT_LENGTH = 10
 
 
-    
-    
-    
-    
-
 # this is a copy of gdsfactory's coupler_asymmetric but uses 4 ports instead of 3
 @gf.cell
 def coupler_asymmetric(
@@ -29,6 +24,7 @@ def coupler_asymmetric(
     dy: float = 2.5,
     dx: float = 10.0,
     cross_section = waveguide_xs(Settings.DEFAULT_WG_WIDTH),
+    straight_length = None
 ) -> gf.Component:
     """Bend coupled to straight waveguide.
 
@@ -48,11 +44,12 @@ def coupler_asymmetric(
          gap o1____________    |  dy
                             o3
     """
+    straight_length = DEFAULT_ASYM_COUPLER_HALF_STRAIGHT_LENGTH if straight_length is None else straight_length
     c = gf.Component()
     x = gf.get_cross_section(cross_section)
     width = x.width
     bend = gf.components.bend_s(size=(dx, dy - gap - width), cross_section=cross_section)
-    wg = gf.components.straight(cross_section=cross_section, length = DEFAULT_ASYM_COUPLER_HALF_STRAIGHT_LENGTH)
+    wg = gf.components.straight(cross_section=cross_section, length = straight_length)
 
     w = bend.ports[0].dwidth
     y = (w + gap) / 2
@@ -122,6 +119,7 @@ def coupler_asymmetric_full(
     dy: float = 2.5,
     dx: float = 10.0,
     coupling_length: float = 5,
+    straight_length = None,
     cross_section = waveguide_xs(Settings.DEFAULT_WG_WIDTH),
 ) -> gf.Component:
     c = gf.Component()
@@ -136,7 +134,7 @@ def coupler_asymmetric_full(
                             
     """
     # place half ring couplers
-    half_coupler = coupler_asymmetric(gap, dy, dx, cross_section)
+    half_coupler = coupler_asymmetric(gap, dy, dx, cross_section, straight_length)
     c1 = c << half_coupler
     c2 = c << half_coupler
     c2.dmirror_x()

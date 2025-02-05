@@ -44,6 +44,8 @@ class LayerMapUNO:#(LayerMap):
     ANT_HANDLING: Layer = (202, 0)
     ANT_THERMAL_TRENCH: Layer = (203, 0)
     ANNOTATION: Layer = (210, 0) # gds-only annotations, not printed
+    
+    WAFER: Layer = (999, 0) # useful for tidy3D integration
 
 
 def waveguide_xs(width=None, layer=None, radius=None):
