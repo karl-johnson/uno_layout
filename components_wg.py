@@ -80,8 +80,13 @@ def coupler_asymmetric(
     return c
 
 @gf.cell
-def asymmetric_coupler(wgWidth = 0.5, couplingLength = 10.0, 
-                           couplerDx =10.0, couplerDy = 10.0, couplerGap = 0.5, busLen = 20.0, crossSection=None):
+def asymmetric_coupler(wgWidth = 0.5,
+                       couplingLength = 10.0, 
+                       couplerDx =10.0, 
+                       couplerDy = 10.0, 
+                       couplerGap = 0.5, 
+                       busLen = 20.0, 
+                       crossSection=None):
     c = gf.Component()
     if crossSection == None:
         crossSection = waveguide_xs(wgWidth)
