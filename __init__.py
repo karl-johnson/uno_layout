@@ -66,11 +66,12 @@ def waveguide_xs(width=None, layer=None, radius=None):
 
 
 
-def routing_xs(rtWidth = Settings.DEFAULT_ROUTE_WIDTH):
+def routing_xs(rtWidth = Settings.DEFAULT_ROUTE_WIDTH, layer = None):
     # default if passed None:
     rtWidth = Settings.DEFAULT_ROUTE_WIDTH if rtWidth is None else rtWidth
+    layer = LayerMapUNO.ROUTING if layer is None else layer
     return gf.cross_section.cross_section(width = rtWidth, 
-                                   layer = Settings.LAYERS.ROUTING,
+                                   layer = layer,
                                    port_names=('e0', 'e1'),
                                    port_types=('electrical', 'electrical'))
 

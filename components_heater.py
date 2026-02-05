@@ -1,6 +1,12 @@
 import numpy as np
 import gdsfactory as gf
-from uno_layout import LAYERS, DEFAULT_ROUTE_WIDTH, routing_xs
+import uno_layout
+from uno_layout import routing_xs
+this_Settings = uno_layout.Settings()
+DEFAULT_ROUTE_WIDTH = this_Settings.DEFAULT_ROUTE_WIDTH
+
+
+from uno_layout import LayerMapUNO as LAYERS
 
 @gf.cell
 def rect_heater(length = 50, width = 10, routeWidth = None):
