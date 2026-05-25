@@ -528,13 +528,14 @@ def dicing_tick_single(w1 = 75e0, w2 = 75e0, bevel = 5e0, layer = LayerMapUNO.LA
 @gf.cell
 def straight_waveguide(dxdy = Settings.DEFAULT_DXDY,
                        wgWidth = None, 
+                       bendRadius = None,
                        labelIn = None, 
                        labelOut = None,
                        tipWidth = None,
                        boschWidth = DEFAULT_BOSCH_WIDTH):
     # straight waveguide from in->out at specified dx/dy
     c = gf.Component()
-    crossSection = waveguide_xs(wgWidth)
+    crossSection = waveguide_xs(wgWidth, radius = bendRadius)
     ed = c << edge_coupler_pair(dxdy, wgWidth, labelIn, labelOut,
                                 tipWidth = tipWidth,
                                 boschWidth = boschWidth)

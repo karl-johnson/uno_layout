@@ -339,15 +339,15 @@ def two_grating_loopback(gratingCoupler = None, Label = None):
 @gf.cell
 def gen_routed_racetrack(ringComponent = None,
                          wgWidth = DEFAULT_WG_WIDTH,
+                         bendRadius = DEFAULT_RADIUS,
                          offsetX = 500e0,
                          dxdy = (1000e0,1000e0),
                          inLabel = None,
                          outLabel = None,
-                         routingRad = DEFAULT_RADIUS,
                          inputSep = 200e0,
                          outputSep = 200e0,
                          edgeCouplerTip = 0.11e0):
-    crossSection = waveguide_xs(wgWidth)
+    crossSection = waveguide_xs(wgWidth, radius = bendRadius)
     portOrder = ["o2", "o1", "o4", "o3"]
     c = gf.Component()
     r = c << ringComponent
@@ -359,8 +359,8 @@ def gen_routed_racetrack(ringComponent = None,
     if inLabel is not None:
         inLabel0 =  inLabel+'-0'
         outLabel0 = outLabel+'-0'
-        inLabel0 =  inLabel+'-1'
-        outLabel0 = outLabel+'-1'
+        inLabel1 =  inLabel+'-1'
+        outLabel1 = outLabel+'-1'
     else:
         inLabel0 = None
         outLabel0 = None
